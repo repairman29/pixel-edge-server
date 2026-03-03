@@ -1,0 +1,97 @@
+# Pixel 8 Pro Edge Server – Quick Reference
+
+Fill in the placeholders after setup. Use this for SSH, Docker, and OpenClaw from your Mac.
+
+## Connection details
+
+| Item | Value |
+|------|--------|
+| SSH port (VM) | `8022` |
+| Pixel LAN IP | `10.1.10.29` |
+| Tailnet IP (VM) | `100.78.73.64` |
+| Linux username (VM) | `droid` |
+| Mission Control (OpenClaw) | port `18789` |
+
+## One-line commands
+
+**SSH via USB (ADB) – use when Wi‑Fi forwarding doesn’t work:**
+```bash
+adb forward tcp:8022 tcp:8022
+ssh -p 8022 droid@127.0.0.1
+```
+Run the `adb forward` line after each USB reconnect or device reboot.
+
+**SSH via LAN (same network as Pixel):**
+```bash
+ssh -p 8022 droid@10.1.10.29
+```
+
+**SSH via Tailscale (from anywhere):**
+```bash
+ssh -p 8022 droid@100.78.73.64
+```
+
+**Mission Control in browser:**
+```text
+http://100.78.73.64:18789
+```
+Or use the Pixel LAN IP if you’re on the same network and port 18789 is forwarded.
+
+**Docker (run inside VM after SSH):**
+```bash
+docker run hello-world
+docker ps
+```
+
+**OpenClaw (run inside VM; start gateway):**
+```bash
+# From OpenClaw repo directory, e.g.:
+npm start
+# Or with pm2 for persistence:
+pm2 start npm --name openclaw -- start
+```
+
+## Port forwarding (Terminal app)
+
+In **Terminal app → Settings**, turn **SSH** toggle **ON** for port `8022`. Optionally add port `18789` for Mission Control when running OpenClaw.
+
+## Verify PPK state (from Mac)
+
+```bash
+./scripts/verify-setup.sh
+```
+
+## Fix VM and run review (from Mac)
+
+One script to set up SSH key (once), install OpenClaw if needed, start the gateway, and run the review. **Run in Terminal on your Mac** (so you can enter the VM password when asked):
+
+```bash
+cd /Users/jeffadkins/Projects
+./scripts/fix-vm-and-review.sh
+```
+
+Uses Tailscale by default (`droid@100.78.73.64`). For USB: `adb forward tcp:8022 tcp:8022` then `./scripts/fix-vm-and-review.sh droid@127.0.0.1`.
+
+## Optional setup
+
+See **[docs/optional-setup.md](optional-setup.md)** for:
+
+- **SSH over Wi‑Fi** – When the Terminal app exposes port 8022 to the LAN.
+- **Wakelock** – Keeping the device from deep sleep during long runs.
+- **Tensor G3 taskset** – Pinning OpenClaw/LLM to the prime core.
+- **Thermal check** – Script in the VM that logs high temps (if sensors are exposed).
+- **OpenClaw as a daemon** – Persist across reboots:
+
+```bash
+./scripts/setup-openclaw-daemon.sh
+```
+
+**Thermal check** (deploy script to VM and cron):
+
+```bash
+./scripts/setup-thermal-check.sh
+```
+
+## Next on the plan
+
+See **[docs/next-on-plan.md](next-on-plan.md)** for what’s left from the Sovereign Mobile Nexus roadmap: VNC desktop, OpenClaw Heartbeat, local LLM in the VM, hybrid NPU inference, 16KB pages, and homelab containers. Use **scripts/setup-vnc-in-vm.sh** to install a VNC + Xfce desktop in the VM.
