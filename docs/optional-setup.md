@@ -84,3 +84,16 @@ The agent is configured with **full** tool access so it can run shell commands, 
 - SSH into the VM and edit `~/.openclaw/openclaw.json`: set `"tools": { "profile": "messaging" }`, then restart: `systemctl --user restart openclaw-gateway`.
 
 The agent runs with the same privileges as the `droid` user in the VM; keep your allowlist (e.g. `allowFrom`) tight so only you can send it commands.
+
+---
+
+## 7. Gateway health-check (self-heal)
+
+A script runs **every 5 minutes** (systemd user timer): if nothing is listening on port 18789, it restarts the OpenClaw gateway. So if the process dies without systemd noticing, the next run brings it back.
+
+**Install (from Mac):**
+```bash
+./scripts/setup-gateway-healthcheck.sh
+```
+
+**Log:** `ssh -p 8022 droid@100.78.73.64 'tail ~/openclaw-heartbeat/gateway-healthcheck.log'`
