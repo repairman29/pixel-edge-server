@@ -34,4 +34,4 @@ Use the Tensor NPU on the **Android host** for inference while the agent and too
 - [Bridging Android 16 AVF & Tensor G4: NPU Access from Debian VM](https://www.reddit.com/r/Android/comments/1r1nucx/) (concept applies to Tensor G3 as well)
 - Android 16 / AVF docs for “custom VM” or “host-guest networking” to confirm the correct address and method for the VM to reach the host.
 
-This doc is a roadmap; implement the host inference app and VM-side bridge to match your chosen host API.
+**Ready-to-use path:** See **docs/npu-setup-checklist.md** for a step-by-step checklist: clone the MediaPipe sample, add the provided `HttpLlmServer.kt`, then run `./scripts/setup-npu-openclaw.sh` to wire the VM and OpenClaw.

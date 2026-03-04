@@ -14,7 +14,14 @@ __pycache__/
 # OpenClaw / secrets
 .env
 .openclaw/
+.hf-token
 
 # Logs / tmp
 *.log
 tmp/
+npu-shim.log
+gateway-crash-log.txt
+
+# External / large
+.cache/
+mediapipe-samples/

@@ -26,7 +26,7 @@ exec taskset -c 0 openclaw gateway
 WRAP
 chmod +x ~/bin/openclaw-gateway-start.sh
 
-# Systemd user service
+# Systemd user service (MemoryMax limits OOM impact; RestartSec avoids tight crash loops)
 cat > ~/.config/systemd/user/openclaw-gateway.service << 'SVC'
 [Unit]
 Description=OpenClaw gateway
@@ -36,7 +36,8 @@ Wants=network-online.target
 [Service]
 ExecStart=%h/bin/openclaw-gateway-start.sh
 Restart=always
-RestartSec=5
+RestartSec=15
+MemoryMax=450M
 
 [Install]
 WantedBy=default.target

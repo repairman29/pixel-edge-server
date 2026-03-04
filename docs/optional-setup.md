@@ -97,3 +97,46 @@ A script runs **every 5 minutes** (systemd user timer): if nothing is listening 
 ```
 
 **Log:** `ssh -p 8022 droid@100.78.73.64 'tail ~/openclaw-heartbeat/gateway-healthcheck.log'`
+
+---
+
+## 8. Gateway crashing
+
+If the gateway keeps crashing (Telegram/Discord stop responding, or you see restarts in the VM):
+
+1. **Capture logs** (from Mac, after SSH works):
+   ```bash
+   adb forward tcp:8022 tcp:8022   # if using USB
+   ./scripts/capture-gateway-crash-log.sh droid@127.0.0.1
+   ```
+   Opens `gateway-crash-log.txt` with the last 200 lines of gateway journal + dmesg tail.
+
+2. **Re-apply the daemon** with a memory limit and longer restart delay (reduces OOM and crash-loop thrashing):
+   ```bash
+   ./scripts/setup-openclaw-daemon.sh
+   ```
+   (Use `droid@127.0.0.1` after `adb forward` for USB.)
+
+3. **Common causes:** low VM RAM (gateway now capped at 450M), Telegram 409 (only one bot instance), or an uncaught error in OpenClaw—check the captured log for the last stack trace or “Out of memory”.
+
+---
+
+## 9. iPhone Shortcut: “Wake Jarvis” (restart gateway from Tailscale)
+
+A small HTTP server runs on the Pixel VM (port 9180) so any device on your Tailscale network—including an iPhone—can restart the OpenClaw gateway with one tap.
+
+**Install (from Mac, once):**
+```bash
+./scripts/setup-jarvis-wake.sh
+```
+Use `droid@127.0.0.1` after `adb forward tcp:8022 tcp:8022` for USB. The script prints a **token** and the URL; save them.
+
+**iPhone Shortcut:**
+1. Open **Shortcuts** → **New Shortcut** → **Add Action**.
+2. Search for **“Get Contents of URL”** and add it.
+3. Set **URL** to: `http://100.78.73.64:9180/restart-gateway?token=YOUR_TOKEN`  
+   (Replace with your Pixel Tailscale IP and the token from the setup script.)
+4. Optionally add **“Show Result”** or **“Show Notification”** so you see “OK gateway restarting”.
+5. Name the shortcut (e.g. “Wake Jarvis”) and add it to the home screen or ask Siri to run it.
+
+When the bot isn’t responding, run the shortcut; wait ~30 seconds, then try the bot again.
