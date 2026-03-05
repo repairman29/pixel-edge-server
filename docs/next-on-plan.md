@@ -14,6 +14,8 @@ What’s done vs what’s left from the Android 16 edge-server roadmap.
 | Tensor G3 taskset | Done (doc + daemon uses prime core) |
 | Thermal check script | Done (cron every 5 min) |
 | Wakelock / persistence notes | Done (optional-setup.md) |
+| **Claude Gateway (AI inference server)** | **Done** (`claude-gateway/`, `scripts/setup-claude-gateway*.sh`) |
+| **OpenClaw Heartbeat (AI health monitor)** | **Done** (`scripts/claude-heartbeat.sh`, `scripts/setup-claude-heartbeat.sh`) |
 
 ---
 
@@ -31,15 +33,14 @@ See **scripts/setup-vnc-in-vm.sh** (run from Mac) to automate install and first-
 
 ---
 
-### 2. OpenClaw Heartbeat (proactive agent)
+### 2. OpenClaw Heartbeat (proactive agent) — ✅ Done via Claude Gateway
 
-The doc’s “Jarvis-class” behavior: the agent wakes on a schedule and runs a checklist (e.g. HEARTBEAT.md) without you prompting.
+The “Jarvis-class” heartbeat now runs through **Claude Gateway’s `/v1/agent` endpoint**.
 
-- OpenClaw supports heartbeat-style flows; check OpenClaw docs for **HEARTBEAT.md** and cron/scheduler config.
-- **In the VM:** Add a cron job that triggers the agent on an interval (e.g. every 30 min) or use OpenClaw’s built-in heartbeat if available.
-- The agent can check thermal, RSS, calendar, etc., and reply with HEARTBEAT_OK when nothing needs reporting.
-
-No script added here; configure inside OpenClaw / your agent config once the gateway is running.
+- Claude autonomously checks thermal, disk, processes, ports, and service health every 30 min.
+- Reports are written to `~/claude-gateway/heartbeat.log` on the VM.
+- Deploy with `./scripts/setup-claude-heartbeat.sh`.
+- See **docs/claude-gateway.md** for full details.
 
 ---
 
@@ -92,8 +93,9 @@ No extra scripts; use standard Docker commands or compose files.
 
 | Next item | Effort | Notes |
 |-----------|--------|--------|
+| ~~Claude Gateway~~ | ~~Done~~ | `claude-gateway/` + `scripts/setup-claude-gateway*.sh` |
+| ~~Heartbeat~~ | ~~Done~~ | Claude AI heartbeat via `/v1/agent` + cron |
 | VNC desktop | Small | Script + doc; lavapipe only on P8P |
-| Heartbeat | Config | In OpenClaw / cron |
 | Local LLM (VM) | Medium | Docker Model Runner or llama.cpp + SVE |
 | Hybrid NPU | Medium | Host app + ADB bridge from VM |
 | 16KB pages | Optional | Manual; unlock + reset |

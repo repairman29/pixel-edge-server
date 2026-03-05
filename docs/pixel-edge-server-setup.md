@@ -92,6 +92,27 @@ See **[docs/optional-setup.md](optional-setup.md)** for:
 ./scripts/setup-thermal-check.sh
 ```
 
+## Claude Gateway (AI server)
+
+Your Pixel now runs a **Claude Opus 4.6 inference server** — OpenAI-compatible + agentic:
+
+| Item | Value |
+|------|-------|
+| Gateway port | `3456` |
+| Chat endpoint | `POST http://100.78.73.64:3456/v1/chat/completions` |
+| Agent endpoint | `POST http://100.78.73.64:3456/v1/agent` |
+| Health check | `GET  http://100.78.73.64:3456/health` |
+
+**Deploy:**
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+./scripts/setup-claude-gateway.sh          # deploy + test
+./scripts/setup-claude-gateway-daemon.sh   # install as systemd service
+./scripts/setup-claude-heartbeat.sh        # AI health monitor every 30 min
+```
+
+See **[docs/claude-gateway.md](claude-gateway.md)** for full usage, examples, and architecture.
+
 ## Next on the plan
 
-See **[docs/next-on-plan.md](next-on-plan.md)** for what’s left from the Sovereign Mobile Nexus roadmap: VNC desktop, OpenClaw Heartbeat, local LLM in the VM, hybrid NPU inference, 16KB pages, and homelab containers. Use **scripts/setup-vnc-in-vm.sh** to install a VNC + Xfce desktop in the VM.
+See **[docs/next-on-plan.md](next-on-plan.md)** for what’s remaining: VNC desktop, local LLM in the VM, hybrid NPU inference, 16KB pages, and homelab containers. Use **scripts/setup-vnc-in-vm.sh** to install a VNC + Xfce desktop in the VM.
