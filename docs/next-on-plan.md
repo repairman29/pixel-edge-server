@@ -1,6 +1,6 @@
 # Next on the Plan (Sovereign Mobile Nexus)
 
-What’s done vs what’s left from the Android 16 edge-server roadmap.
+What's done vs what's left from the Android 16 edge-server roadmap.
 
 ## Done
 
@@ -13,90 +13,94 @@ What’s done vs what’s left from the Android 16 edge-server roadmap.
 | OpenClaw persistent daemon | Done (systemd user service + taskset) |
 | Tensor G3 taskset | Done (doc + daemon uses prime core) |
 | Thermal check script | Done (cron every 5 min) |
-| Wakelock / persistence notes | Done (optional-setup.md) |
-| **Claude Gateway (AI inference server)** | **Done** (`claude-gateway/`, `scripts/setup-claude-gateway*.sh`) |
-| **OpenClaw Heartbeat (AI health monitor)** | **Done** (`scripts/claude-heartbeat.sh`, `scripts/setup-claude-heartbeat.sh`) |
+| Wakelock / persistence notes | Done (`optional-setup.md`) |
+| **Claude Gateway v1 (AI inference server)** | **Done** (`claude-gateway/`, `scripts/setup-claude-gateway*.sh`) |
+| **OpenClaw Heartbeat (AI health monitor)** | **Done** (`scripts/claude-heartbeat.sh`) |
+| **Claude Gateway v2** | **Done** — Prometheus metrics, rate limiting, Bearer auth, 4 new agent tools (`read_file`, `write_file`, `restart_service`, `http_fetch`), streaming agent SSE endpoint (`/v1/agent/stream`), local LLM routing |
+| **llama.cpp SVE build automation** | **Done** (`scripts/setup-llama-sve.sh`) — ARM SVE optimized, systemd service, auto-links to Claude Gateway |
+| **Homelab Docker stack** | **Done** (`homelab/docker-compose.yml`, `scripts/setup-homelab.sh`) — Ollama + Jellyfin + NGINX reverse proxy |
 
 ---
 
-## Next (in doc order)
+## Next (in priority order)
 
 ### 1. VNC desktop in the VM (optional)
 
-Run a Linux desktop (e.g. KDE Plasma, GNOME) in the VM and view it via VNC on the phone or from your Mac.
+Run a Linux desktop in the VM and view it via VNC on the phone or from your Mac.
 
-- **In the VM:** Install `tigervnc-standalone-server` and a desktop (e.g. `apt install tigervnc-standalone-server xfce4`), then `vncserver :1`.
-- **Port:** 5901. Expose via Tailscale or Terminal app port toggle, then connect with a VNC client to `100.78.73.64:5901` (or Pixel LAN IP).
-- **Note:** Pixel 8 Pro uses lavapipe (software GPU) in the VM; GUI will work but not be GPU-accelerated (gfxstream is Pixel 10 only).
+- **Install:** `apt install tigervnc-standalone-server xfce4 dbus-x11`, then `vncserver :1`
+- **Port:** 5901. Connect from Mac with any VNC client to `100.78.73.64:5901`
+- **Note:** Pixel 8 Pro uses lavapipe (software GPU) in the VM; no hardware acceleration
 
-See **scripts/setup-vnc-in-vm.sh** (run from Mac) to automate install and first-run steps.
-
----
-
-### 2. OpenClaw Heartbeat (proactive agent) — ✅ Done via Claude Gateway
-
-The “Jarvis-class” heartbeat now runs through **Claude Gateway’s `/v1/agent` endpoint**.
-
-- Claude autonomously checks thermal, disk, processes, ports, and service health every 30 min.
-- Reports are written to `~/claude-gateway/heartbeat.log` on the VM.
-- Deploy with `./scripts/setup-claude-heartbeat.sh`.
-- See **docs/claude-gateway.md** for full details.
+See `scripts/setup-vnc-in-vm.sh` (run from Mac) to automate install.
 
 ---
 
-### 3. Local LLM in the VM (CPU-bound)
+### 2. Local LLM — use it
 
-Run a small model inside the Debian VM with Docker or llama.cpp.
+Now that `scripts/setup-llama-sve.sh` is available:
 
-- **Docker Model Runner:** In the VM, use Docker to run an OpenAI-compatible LLM server (e.g. `docker run ...` per [Docker Model Runner](https://www.docker.com/blog/run-llms-locally/)). Point OpenClaw at `http://127.0.0.1:port` as the model endpoint.
-- **llama.cpp (bare metal):** Build with `-DGGML_SVE=TRUE` for ARM SVE; run a small GGUF (e.g. 3B) for ~12–16 tok/s on the device. Then expose an API or use OpenClaw’s local model config.
+```bash
+# Build llama.cpp with SVE, download Llama-3.2-3B, link to Claude Gateway
+bash scripts/setup-llama-sve.sh
 
-See **docs/local-llm-in-vm.md** for minimal steps (Docker Model Runner + optional llama.cpp).
+# Or run Ollama via homelab stack
+bash scripts/setup-homelab.sh
+```
 
----
+With `LOCAL_LLM_URL` set in the gateway env, requesting model `"local"` or any `haiku/*`
+model name routes to your on-device LLM instead of the Claude API — zero API cost.
 
-### 4. Hybrid NPU inference (VM + Android host)
-
-Use the Tensor NPU on the **Android host** while the agent runs in the **VM**, via ADB.
-
-- **Android host:** Install an app or service that runs MediaPipe LLM Inference (or similar) and accepts prompts (e.g. via local API or `adb shell`).
-- **In the VM:** Install ADB, run `adb connect 127.0.0.1:5555` (with host listening for ADB on 5555), then a bridge script in the VM sends prompts to the host (e.g. `adb shell am start ...` or a small server on the host) and reads back tokens.
-- **Result:** Orchestration and tools in the VM; heavy inference on the NPU.
-
-See **docs/hybrid-npu-inference.md** for architecture and step-by-step.
+See `docs/local-llm-in-vm.md` for detail on both backends.
 
 ---
 
-### 5. 16KB memory pages (optional, destructive) — skipped by default
+### 3. Hybrid NPU inference (VM + Android host)
 
-Can improve memory efficiency and some workloads in the VM.
+Use the Tensor G3 NPU on the Android host while the agent runs in the VM.
 
-- **Cost:** Bootloader unlock + factory reset. Not reversible without reflashing.
-- **Steps:** Unlock bootloader, enable 16KB page size in Developer options (if available on your build), then factory reset. Only do this if you need maximum VM memory performance and accept the wipe.
-- **We do not run this automatically;** it is destructive. Perform manually if you choose.
+- **Android host:** Install an app that runs MediaPipe LLM Inference and accepts prompts
+  (local API or `adb shell`)
+- **VM bridge:** `adb connect 127.0.0.1:5555`, then call the host-side inference API
 
----
-
-### 6. Homelab-style containers (optional)
-
-The doc mentions CasaOS, Jellyfin, NGINX as examples. You already have Docker; run any of these in the VM as normal containers.
-
-- **CasaOS:** See [CasaOS](https://github.com/IceWhaleTech/CasaOS) for ARM/Docker.
-- **Jellyfin:** `docker run -p 8096:8096 jellyfin/jellyfin` (or use docker-compose).
-- **NGINX:** `docker run -p 80:80 nginx`.
-
-No extra scripts; use standard Docker commands or compose files.
+See `scripts/npu-bridge.sh` (stub, needs host-side implementation) and
+`docs/hybrid-npu-inference.md`.
 
 ---
 
-## Summary
+### 4. Prometheus + Grafana monitoring (optional)
 
-| Next item | Effort | Notes |
-|-----------|--------|--------|
-| ~~Claude Gateway~~ | ~~Done~~ | `claude-gateway/` + `scripts/setup-claude-gateway*.sh` |
-| ~~Heartbeat~~ | ~~Done~~ | Claude AI heartbeat via `/v1/agent` + cron |
-| VNC desktop | Small | Script + doc; lavapipe only on P8P |
-| Local LLM (VM) | Medium | Docker Model Runner or llama.cpp + SVE |
-| Hybrid NPU | Medium | Host app + ADB bridge from VM |
-| 16KB pages | Optional | Manual; unlock + reset |
-| Homelab containers | Small | Use Docker as needed |
+Claude Gateway v2 exposes `/metrics` in Prometheus format.
+
+```bash
+# Quick local scrape
+curl http://100.78.73.64:3456/metrics
+
+# Add to Prometheus scrape_configs
+- job_name: pixel_gateway
+  static_configs:
+    - targets: ['100.78.73.64:3456']
+```
+
+Run Grafana in the homelab stack (`homelab/docker-compose.yml`) for dashboards.
+
+---
+
+### 5. 16KB memory pages (optional, destructive)
+
+Can improve memory efficiency for VM workloads.
+
+- **Cost:** Bootloader unlock + factory reset — not reversible without reflashing
+- **Skip by default.** Only do this if you need maximum VM memory performance
+
+---
+
+## Quick Reference: What to run next
+
+| Goal | Command |
+|------|---------|
+| Enable on-device LLM (llama.cpp, SVE-optimized) | `bash scripts/setup-llama-sve.sh` |
+| Start full homelab (Ollama + Jellyfin + NGINX) | `bash scripts/setup-homelab.sh` |
+| Enable VNC desktop | `bash scripts/setup-vnc-in-vm.sh` |
+| Prometheus metrics | `curl http://100.78.73.64:3456/metrics` |
+| Stream a live agent task | `curl -s -XPOST .../v1/agent/stream ...` |
