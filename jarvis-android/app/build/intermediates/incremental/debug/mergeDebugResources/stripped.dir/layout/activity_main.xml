@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="20dp">
+
+        <View
+            android:id="@+id/statusDot"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:background="#666666"
+            android:layout_marginEnd="10dp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="JARVIS"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:letterSpacing="0.15" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="D6 CONSORTIUM"
+            android:textSize="10sp"
+            android:textColor="#666666" />
+    </LinearLayout>
+
+    <!-- Telegram Token -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="TELEGRAM BOT TOKEN"
+        android:textSize="11sp"
+        android:textColor="#888888"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/tokenInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="1234567890:ABCdef..."
+        android:textColor="#FFFFFF"
+        android:textColorHint="#444444"
+        android:background="#1E1E1E"
+        android:padding="12dp"
+        android:inputType="textVisiblePassword"
+        android:fontFamily="monospace"
+        android:textSize="13sp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Model Path -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="MODEL PATH"
+        android:textSize="11sp"
+        android:textColor="#888888"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="6dp" />
+
+    <EditText
+        android:id="@+id/modelPathInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="/data/local/tmp/llm/model.bin"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#444444"
+        android:background="#1E1E1E"
+        android:padding="12dp"
+        android:inputType="text"
+        android:fontFamily="monospace"
+        android:textSize="13sp"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Start / Stop Button -->
+    <Button
+        android:id="@+id/startStopButton"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:text="START JARVIS"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:background="#2E7D32"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Status Log Label -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="STATUS LOG"
+        android:textSize="11sp"
+        android:textColor="#888888"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="6dp" />
+
+    <!-- Scrollable Log -->
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#0D0D0D">
+
+        <TextView
+            android:id="@+id/statusLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:textColor="#00FF88"
+            android:fontFamily="monospace"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+    </ScrollView>
+
+</LinearLayout>
