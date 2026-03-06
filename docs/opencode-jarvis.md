@@ -25,6 +25,22 @@ OpenCode runs as a **headless server** in the Pixel VM so Jarvis can use it for 
 3. **Health check**  
    `curl -s http://127.0.0.1:4096/global/health` → `{"healthy":true,"version":"..."}`
 
+## Driving OpenCode from Claude Gateway
+
+The gateway's agent endpoint can trigger OpenCode tasks via the `run_shell` tool. From anywhere on your network:
+
+```bash
+curl -s -X POST http://100.78.73.64:3456/v1/agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task": "In the VM, run: opencode run --attach http://127.0.0.1:4096 \"Add docstrings to all public functions in ~/workspace/myproject/main.py\""
+  }' | jq -r '.result'
+```
+
+This lets Jarvis (or any remote caller) queue coding tasks against the on-device OpenCode server without a direct SSH session.
+
+---
+
 ## One-time setup (in VM)
 
 If OpenCode asks for config or auth:
@@ -35,3 +51,10 @@ opencode auth login   # optional: add API keys for providers
 ```
 
 Ensure `~/.opencode/bin` is on PATH when you run `opencode` (or use the full path).
+
+If the service fails to start, check logs:
+
+```bash
+systemctl --user status opencode-serve
+journalctl --user -u opencode-serve -n 50
+```

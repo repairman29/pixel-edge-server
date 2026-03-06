@@ -6,12 +6,12 @@
 
 set -e
 
-SSH_OPTS="-p 8022 -o ConnectTimeout=15 -o StrictHostKeyChecking=no"
-TARGET="${1:-droid@100.78.73.64}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "=== Installing VNC + minimal desktop in VM (${TARGET}) ==="
+vm_banner "VNC + minimal desktop"
 
-ssh $SSH_OPTS "$TARGET" bash -s << 'REMOTE'
+vm_ssh_heredoc << 'REMOTE'
 set -e
 sudo apt update
 sudo apt install -y tigervnc-standalone-server xfce4 xfce4-goodies dbus-x11
@@ -26,5 +26,5 @@ echo "  2. Start the server:  vncserver :1"
 echo "  3. From your Mac or phone VNC client, connect to 100.78.73.64:5901"
 echo ""
 echo "To start VNC now over SSH:"
-echo "  ssh -p 8022 $TARGET 'vncserver :1 -geometry 1280x720 -depth 24'"
-echo "Stop with: ssh -p 8022 $TARGET 'vncserver -kill :1'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'vncserver :1 -geometry 1280x720 -depth 24'"
+echo "Stop with: ssh -p ${VM_PORT} ${VM_HOST} 'vncserver -kill :1'"

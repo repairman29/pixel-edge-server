@@ -6,13 +6,13 @@
 
 set -e
 
-SSH_OPTS="-p 8022 -o ConnectTimeout=15 -o StrictHostKeyChecking=no"
-TARGET="${1:-droid@100.78.73.64}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 OPENCODE_PORT="${OPENCODE_PORT:-4096}"
 
-echo "=== Installing OpenCode and opencode-serve service on ${TARGET} ==="
+vm_banner "OpenCode + opencode-serve setup"
 
-ssh $SSH_OPTS "$TARGET" bash -s << REMOTE
+vm_ssh_heredoc << REMOTE
 set -e
 export PATH="\$HOME/.opencode/bin:\$PATH"
 
@@ -73,4 +73,4 @@ echo "Jarvis can use it with: opencode run --attach http://127.0.0.1:${OPENCODE_
 echo "API spec: http://127.0.0.1:${OPENCODE_PORT}/doc"
 echo ""
 echo "One-time: SSH in and run 'opencode init' (and optionally 'opencode auth login') to configure providers/API keys."
-echo "To check: ssh -p 8022 $TARGET 'systemctl --user status opencode-serve'"
+echo "To check: ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user status opencode-serve'"

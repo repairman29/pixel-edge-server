@@ -1,0 +1,71 @@
+# homelab/docker-compose.yml — Pixel 8 Pro Homelab Stack
+#
+# Services:
+#   ollama      — local LLM inference (OpenAI-compatible, port 11434)
+#   jellyfin    — media server (port 8096)
+#   nginx       — reverse proxy (port 80 → all services)
+#
+# Deploy:
+#   cd ~/homelab && docker compose up -d
+#
+# Or use: bash scripts/setup-homelab.sh (from your Mac)
+#
+# Models (after Ollama is running):
+#   docker exec ollama ollama pull llama3.2:3b
+#   docker exec ollama ollama pull phi3.5
+#   docker exec ollama ollama pull mistral:7b-instruct-q4_0
+
+services:
+
+  # ── Ollama — local LLM inference ─────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+    # Keep memory usage in check on 12GB RAM device
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+
+  # ── Jellyfin — media server ────────────────────────────────────────────────
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    volumes:
+      - jellyfin_config:/config
+      - jellyfin_cache:/cache
+      # Mount Android shared storage if accessible from VM
+      # Uncomment and adjust path after mounting Android storage in VM:
+      # - /mnt/media:/media:ro
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://100.78.73.64:8096
+
+  # ── NGINX — reverse proxy ──────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - ollama
+      - jellyfin
+
+volumes:
+  ollama_data:
+  jellyfin_config:
+  jellyfin_cache:

@@ -3,24 +3,29 @@
 # Run from your Mac. Uses Tailscale by default.
 # Usage: ./scripts/setup-openclaw-daemon.sh [droid@100.78.73.64]
 
-set -e
+set -euo pipefail
 
-SSH_OPTS="-p 8022 -o ConnectTimeout=15 -o StrictHostKeyChecking=no"
-TARGET="${1:-droid@100.78.73.64}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "=== Setting up OpenClaw daemon on ${TARGET} ==="
+vm_banner "OpenClaw daemon setup"
 
 # Create wrapper and systemd user service in the VM
-ssh $SSH_OPTS "$TARGET" bash -s << 'REMOTE'
-set -e
+vm_ssh_heredoc << 'REMOTE'
+set -euo pipefail
 mkdir -p ~/bin ~/.config/systemd/user
 
 # Wrapper: load nvm and run openclaw gateway (optionally on prime core with taskset)
 cat > ~/bin/openclaw-gateway-start.sh << 'WRAP'
 #!/bin/bash
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-nvm use 22 2>/dev/null || true
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+  . "$NVM_DIR/nvm.sh"
+  nvm use 22 || { echo "ERROR: nvm could not activate Node 22. Run 'nvm install 22' on the VM."; exit 1; }
+else
+  echo "ERROR: NVM not found at $NVM_DIR/nvm.sh. Install NVM on the VM first." >&2
+  exit 1
+fi
 # Optional: pin to prime core (Tensor G3). Remove the 'taskset -c 0' to use all cores.
 exec taskset -c 0 openclaw gateway
 WRAP
@@ -43,18 +48,33 @@ WantedBy=default.target
 SVC
 
 # Enable user lingering so the service runs without an active login
-sudo loginctl enable-linger "$USER" 2>/dev/null || true
+sudo loginctl enable-linger "${USER}" 2>/dev/null || true
 
 # Reload, enable, and start
 systemctl --user daemon-reload
 systemctl --user enable openclaw-gateway.service
 systemctl --user restart openclaw-gateway.service
-systemctl --user status openclaw-gateway.service --no-pager || true
+
+# Wait until port 18789 is actually listening (up to 20s — openclaw takes a moment)
+for i in $(seq 1 20); do
+  ss -tlnp 2>/dev/null | grep -q ':18789' && break
+  sleep 1
+done
+
+if ! ss -tlnp 2>/dev/null | grep -q ':18789'; then
+  echo 'ERROR: openclaw-gateway started but port 18789 is not listening after 20s.'
+  systemctl --user status openclaw-gateway.service --no-pager
+  journalctl --user -u openclaw-gateway.service -n 20 --no-pager
+  exit 1
+fi
+
+echo 'Port 18789 is listening.'
+systemctl --user status openclaw-gateway.service --no-pager
 REMOTE
 
 echo ""
 echo "OpenClaw gateway is installed as a user service and should be running."
 echo "Mission Control: http://100.78.73.64:18789"
-echo "To check: ssh -p 8022 $TARGET 'systemctl --user status openclaw-gateway'"
-echo "To stop:  ssh -p 8022 $TARGET 'systemctl --user stop openclaw-gateway'"
-echo "To start: ssh -p 8022 $TARGET 'systemctl --user start openclaw-gateway'"
+echo "To check: ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user status openclaw-gateway'"
+echo "To stop:  ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user stop openclaw-gateway'"
+echo "To start: ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user start openclaw-gateway'"
