@@ -119,4 +119,60 @@ class TermuxBridge(private val context: Context) {
     suspend fun adbShell(command: String): String {
         return executeShell(command)
     }
+
+    /**
+     * Write content to file
+     */
+    suspend fun writeFile(path: String, content: String): String = withContext(Dispatchers.IO) {
+        try {
+            // Handle Android storage paths
+            val resolvedPath = when {
+                path == "/sdcard" || path.startsWith("/sdcard/") -> 
+                    path.replace("/sdcard", "/storage/emulated/0")
+                else -> path
+            }
+            
+            // Escape the content for shell
+            val escapedContent = content.replace("'", "'\"'\"'").replace("\n", "\\n")
+            
+            executeShell("echo '$escapedContent' > '$resolvedPath' 2>&1 && echo 'File written successfully' || echo 'Error writing file'")
+        } catch (e: Exception) {
+            "Error writing file: ${e.message}"
+        }
+    }
+
+    /**
+     * Find files matching pattern
+     */
+    suspend fun findFiles(pattern: String, path: String = "/storage/emulated/0"): String = withContext(Dispatchers.IO) {
+        try {
+            val resolvedPath = when {
+                path == "/sdcard" || path.startsWith("/sdcard/") -> 
+                    path.replace("/sdcard", "/storage/emulated/0")
+                else -> path
+            }
+            
+            executeShell("find '$resolvedPath' -name '*$pattern*' -type f 2>/dev/null | head -20")
+        } catch (e: Exception) {
+            "Error finding files: ${e.message}"
+        }
+    }
+
+    /**
+     * Run script file
+     */
+    suspend fun runScript(scriptPath: String): String = withContext(Dispatchers.IO) {
+        try {
+            val resolvedPath = when {
+                scriptPath == "/sdcard" || scriptPath.startsWith("/sdcard/") -> 
+                    scriptPath.replace("/sdcard", "/storage/emulated/0")
+                else -> scriptPath
+            }
+            
+            // Make script executable and run it
+            executeShell("chmod +x '$resolvedPath' && '$resolvedPath' 2>&1")
+        } catch (e: Exception) {
+            "Error running script: ${e.message}"
+        }
+    }
 }

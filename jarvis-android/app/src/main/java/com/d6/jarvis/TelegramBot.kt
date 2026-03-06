@@ -138,6 +138,7 @@ class TelegramBot(
                 "Sorry, I hit an error: ${e.message}"
             }
 
+            Log.d(TAG, "Sending reply to $chatId: ${reply.take(50)}...")
             sendMessage(chatId, reply)
         }
     }

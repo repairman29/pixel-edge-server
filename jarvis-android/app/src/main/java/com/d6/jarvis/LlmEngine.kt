@@ -8,8 +8,9 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.Semaphore
 
 /**
- * Wraps MediaPipe LlmInference.
- * Thread-safe: one inference at a time (NPU doesn't support concurrent calls).
+ * Wraps MediaPipe LlmInference with dual backend support (CPU & GPU/NPU).
+ * Thread-safe: one inference at a time.
+ * Auto-detects and uses GPU/NPU when available, falls back to CPU.
  */
 class LlmEngine(private val context: Context) {
 
@@ -17,10 +18,16 @@ class LlmEngine(private val context: Context) {
         private const val TAG = "LlmEngine"
         const val DEFAULT_MODEL_PATH = "/data/local/tmp/llm/model.task"
         const val MAX_TOKENS = 512
+        
+        enum class BackendPreference {
+            AUTO,      // Try GPU first, fallback to CPU
+            CPU,       // Force CPU only
+            GPU        // Force GPU/NPU only
+        }
     }
 
     private var llm: LlmInference? = null
-    private val lock = Semaphore(1) // One inference at a time
+    private val lock = Semaphore(1)
 
     @Volatile
     var isReady = false
@@ -30,28 +37,84 @@ class LlmEngine(private val context: Context) {
     var loadError: String? = null
         private set
 
+    @Volatile
+    var activeBackend: LlmInference.Backend? = null
+        private set
+
     /**
-     * Load the model. Call once from a background thread / coroutine.
+     * Load the model with automatic backend detection.
+     * Uses GPU/NPU if available, otherwise falls back to CPU.
      */
-    suspend fun initialize(modelPath: String) = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Loading model from $modelPath")
+    suspend fun initialize(
+        modelPath: String = DEFAULT_MODEL_PATH,
+        preference: BackendPreference = BackendPreference.AUTO
+    ) = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Loading model from $modelPath with preference: $preference")
         isReady = false
         loadError = null
+        activeBackend = null
 
+        when (preference) {
+            BackendPreference.CPU -> initializeWithBackend(modelPath, LlmInference.Backend.CPU)
+            BackendPreference.GPU -> initializeWithBackend(modelPath, LlmInference.Backend.GPU)
+            BackendPreference.AUTO -> initializeAuto(modelPath)
+        }
+    }
+
+    /**
+     * Try GPU/NPU first, then fallback to CPU.
+     */
+    private fun initializeAuto(modelPath: String) {
+        // Try GPU/NPU first
         try {
+            Log.d(TAG, "Attempting to initialize with GPU/NPU backend...")
+            initializeWithBackend(modelPath, LlmInference.Backend.GPU)
+            Log.d(TAG, "Successfully initialized with GPU/NPU backend")
+            return
+        } catch (e: Exception) {
+            Log.w(TAG, "GPU/NPU initialization failed: ${e.message}, falling back to CPU")
+        }
+
+        // Fallback to CPU
+        try {
+            Log.d(TAG, "Attempting to initialize with CPU backend...")
+            initializeWithBackend(modelPath, LlmInference.Backend.CPU)
+            Log.d(TAG, "Successfully initialized with CPU backend")
+        } catch (e: Exception) {
+            loadError = "Failed to initialize with both GPU and CPU: ${e.message}"
+            Log.e(TAG, loadError!!, e)
+            throw e
+        }
+    }
+
+    /**
+     * Initialize with specific backend.
+     */
+    private fun initializeWithBackend(modelPath: String, backend: LlmInference.Backend) {
+        try {
+            Log.d(TAG, "Configuring for ${if (backend == LlmInference.Backend.GPU) "GPU/NPU" else "CPU"} execution")
+
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelPath)
                 .setMaxTokens(MAX_TOKENS)
-                .setPreferredBackend(LlmInference.Backend.CPU)
+                .setPreferredBackend(backend)
                 .build()
 
             llm?.close()
             llm = LlmInference.createFromOptions(context, options)
+            activeBackend = backend
             isReady = true
-            Log.d(TAG, "Model loaded OK")
+            
+            val backendName = when (backend) {
+                LlmInference.Backend.GPU -> "GPU/NPU"
+                LlmInference.Backend.CPU -> "CPU"
+                else -> "UNKNOWN"
+            }
+            Log.d(TAG, "Model loaded successfully with $backendName backend")
+            
         } catch (e: Exception) {
-            loadError = e.message ?: "Unknown error"
-            Log.e(TAG, "Failed to load model", e)
+            loadError = "Failed to initialize with ${backend.name}: ${e.message}"
+            Log.e(TAG, loadError!!, e)
             throw e
         }
     }
@@ -65,12 +128,30 @@ class LlmEngine(private val context: Context) {
 
         lock.acquire()
         try {
-            Log.d(TAG, "Generating for prompt (${prompt.length} chars)")
+            Log.d(TAG, "Generating for prompt (${prompt.length} chars) using ${activeBackend?.name ?: "unknown"} backend")
+            val startTime = System.currentTimeMillis()
             val result = engine.generateResponse(prompt)
-            Log.d(TAG, "Generation done (${result.length} chars)")
+            val duration = System.currentTimeMillis() - startTime
+            Log.d(TAG, "Generation done (${result.length} chars) in ${duration}ms")
             result
         } finally {
             lock.release()
+        }
+    }
+
+    /**
+     * Get current backend status for display.
+     */
+    fun getStatus(): String {
+        return if (isReady) {
+            val backend = when (activeBackend) {
+                LlmInference.Backend.GPU -> "GPU/NPU (Tensor G3)"
+                LlmInference.Backend.CPU -> "CPU"
+                else -> "Unknown"
+            }
+            "Ready - Using $backend backend"
+        } else {
+            "Not ready${loadError?.let { ": $it" } ?: ""}"
         }
     }
 
@@ -95,5 +176,6 @@ class LlmEngine(private val context: Context) {
         llm?.close()
         llm = null
         isReady = false
+        activeBackend = null
     }
 }
