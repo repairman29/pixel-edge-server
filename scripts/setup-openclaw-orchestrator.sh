@@ -73,7 +73,7 @@ REMOTE
 
 # ── Run a one-shot test ───────────────────────────────────────────────────────
 echo ""
-echo "==> [3/3] Running first orchestrator cycle (this takes ~60-90s)..."
+echo "==> [3/3] Running first orchestrator cycle (this takes up to ~3 min)..."
 echo "  (Claude will check all services, fix any issues, write status.md)"
 echo ""
 
