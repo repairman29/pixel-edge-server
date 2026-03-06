@@ -260,6 +260,14 @@ async function handleChat(req, res) {
     return proxyToLocalLLM(body, res);
   }
 
+  // Reject models that are clearly not Anthropic and not proxied to local LLM.
+  // claude-* models are passed through; the API itself validates the exact name.
+  if (model && !model.startsWith('claude-')) {
+    return sendJSON(res, 400, {
+      error: { type: 'invalid_request_error', message: `Unsupported model '${model}'. Use a claude-* model or set LOCAL_LLM_URL to proxy other models.` },
+    });
+  }
+
   const systemMsg = messages.find(m => m.role === 'system');
   const userMsgs  = messages
     .filter(m => m.role !== 'system')

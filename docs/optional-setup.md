@@ -110,3 +110,29 @@ ssh -p 8022 droid@100.78.73.64 'cat ~/openclaw-orchestrator/status.md'
 **Layer 3: Claude heartbeat** (every 30 min, AI diagnostic) — deeper analysis with remediation authority. Install with `./scripts/setup-claude-heartbeat.sh`. See **[docs/claude-gateway.md](claude-gateway.md)** → AI Heartbeat section.
 
 All systemd services also have `Restart=on-failure` (Claude Gateway) or `Restart=always` (OpenClaw) as a baseline.
+
+---
+
+## 8. Port reference
+
+All services and their ports. Internal scripts use `127.0.0.1`; reach the device from your Mac via Tailscale (`100.78.73.64`) or LAN IP.
+
+| Service | Port | Internal URL | Tailscale URL | Notes |
+|---------|------|-------------|--------------|-------|
+| Claude Gateway | 3456 | `http://127.0.0.1:3456` | `http://100.78.73.64:3456` | `/health`, `/metrics`, `/v1/chat/completions`, `/v1/agent` |
+| OpenClaw gateway | 18789 | `http://127.0.0.1:18789` | `http://100.78.73.64:18789` | Mission Control UI + API |
+| llama-server (llama.cpp) | 8080 | `http://127.0.0.1:8080` | `http://100.78.73.64:8080` | Optional; installed by `setup-llama-sve.sh` |
+| Ollama (Docker) | 11434 | `http://127.0.0.1:11434` | `http://100.78.73.64:11434` | Optional; installed by `setup-homelab.sh` |
+| Jellyfin (Docker) | 8096 | `http://127.0.0.1:8096` | `http://100.78.73.64:8096` | Optional; installed by `setup-homelab.sh` |
+| VM SSH | 8022 | — | `ssh -p 8022 droid@100.78.73.64` | Or `droid@127.0.0.1` over USB |
+
+**Environment variables** that configure these:
+
+| Variable | Where used | Default |
+|----------|-----------|---------|
+| `ANTHROPIC_API_KEY` | `claude-gateway/.env` on VM | *(required — no default)* |
+| `CLAUDE_GATEWAY_PORT` | `claude-gateway/.env` on VM | `3456` |
+| `CLAUDE_MODEL` | `claude-gateway/.env` on VM | `claude-opus-4-6` |
+| `CLAUDE_GATEWAY_URL` | `openclaw-orchestrator.sh`, `claude-heartbeat.sh` on VM | `http://127.0.0.1:3456` |
+| `LOCAL_LLM_URL` | `claude-gateway/.env` on VM | *(unset — local LLM disabled)* |
+| `GATEWAY_API_KEY` | `claude-gateway/.env` on VM | *(unset — no auth required)* |
