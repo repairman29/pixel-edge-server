@@ -16,9 +16,20 @@ vm_banner "Claude Gateway — Deploy to Pixel VM"
 
 # ── 1. Confirm ANTHROPIC_API_KEY is available ──────────────────────────────────
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "⚠  ANTHROPIC_API_KEY is not set in your local environment."
-  echo "   You'll need to set it in ~/.config/claude-gateway/.env on the VM."
   echo ""
+  echo "ERROR: ANTHROPIC_API_KEY is not set."
+  echo ""
+  echo "  export ANTHROPIC_API_KEY=sk-ant-..."
+  echo "  bash scripts/setup-claude-gateway.sh"
+  echo ""
+  exit 1
+fi
+if [[ "${ANTHROPIC_API_KEY}" == "REPLACE_ME" ]]; then
+  echo ""
+  echo "ERROR: ANTHROPIC_API_KEY is still set to the placeholder 'REPLACE_ME'."
+  echo "  Set it to a real key before deploying."
+  echo ""
+  exit 1
 fi
 
 # ── 2. Create directory structure in the VM ───────────────────────────────────

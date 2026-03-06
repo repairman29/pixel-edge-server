@@ -40,7 +40,21 @@ vm_ssh "
   systemctl --user daemon-reload
   systemctl --user enable claude-gateway
   systemctl --user restart claude-gateway
-  sleep 2
+
+  # Wait until port 3456 is actually listening (up to 15s)
+  for i in \$(seq 1 15); do
+    ss -tlnp 2>/dev/null | grep -q ':3456' && break
+    sleep 1
+  done
+
+  if ! ss -tlnp 2>/dev/null | grep -q ':3456'; then
+    echo 'ERROR: claude-gateway started but port 3456 is not listening after 15s.'
+    systemctl --user status claude-gateway --no-pager
+    journalctl --user -u claude-gateway -n 20 --no-pager
+    exit 1
+  fi
+
+  echo 'Port 3456 is listening.'
   systemctl --user status claude-gateway --no-pager
 "
 

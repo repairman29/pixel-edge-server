@@ -10,6 +10,11 @@
 
 set -euo pipefail
 
+# ── Dependency check ───────────────────────────────────────────────────────────
+for _cmd in curl jq; do
+  command -v "${_cmd}" >/dev/null 2>&1 || { echo "ERROR: required command '${_cmd}' not found. Install it and retry."; exit 1; }
+done
+
 GATEWAY_URL="${CLAUDE_GATEWAY_URL:-http://127.0.0.1:3456}"
 LOG_FILE="${HOME}/claude-gateway/heartbeat.log"
 MAX_LOG_LINES=1000   # rotate when log grows past this
@@ -103,9 +108,11 @@ log ""
 # ── Rotate log if it's grown too large ────────────────────────────────────────
 LINE_COUNT=$(wc -l < "${LOG_FILE}" 2>/dev/null || echo 0)
 if (( LINE_COUNT > MAX_LOG_LINES )); then
-  TMPFILE=$(mktemp)
-  tail -n ${MAX_LOG_LINES} "${LOG_FILE}" > "${TMPFILE}"
-  mv "${TMPFILE}" "${LOG_FILE}"
+  TMPFILE=$(mktemp "${LOG_FILE}.XXXXXX")
+  trap 'rm -f "${TMPFILE}"' EXIT
+  tail -n "${MAX_LOG_LINES}" "${LOG_FILE}" > "${TMPFILE}"
+  mv -f "${TMPFILE}" "${LOG_FILE}"
+  trap - EXIT
 fi
 
 log "─── Heartbeat end ───────────────────────────────────"

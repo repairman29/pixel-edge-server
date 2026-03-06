@@ -78,6 +78,7 @@ echo "  (Claude will check all services, fix any issues, write status.md)"
 echo ""
 
 vm_ssh_heredoc <<'REMOTE'
+set -euo pipefail
 if ! curl -sf http://127.0.0.1:3456/health >/dev/null 2>&1; then
   echo "  WARN: Claude Gateway not reachable — skipping test run."
   echo "  Start the gateway first: systemctl --user start claude-gateway"
