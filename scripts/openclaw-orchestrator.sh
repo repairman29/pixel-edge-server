@@ -23,6 +23,11 @@
 
 set -uo pipefail
 
+# ── Dependency check ───────────────────────────────────────────────────────────
+for _cmd in curl jq; do
+  command -v "${_cmd}" >/dev/null 2>&1 || { echo "ERROR: required command '${_cmd}' not found. Install it and retry."; exit 1; }
+done
+
 GATEWAY="${CLAUDE_GATEWAY_URL:-http://127.0.0.1:3456}"
 STATUS_FILE="${HOME}/openclaw-orchestrator/status.md"
 LOG_FILE="${HOME}/openclaw-orchestrator/orchestrator.log"
@@ -39,9 +44,11 @@ log() { echo "[$(ts)] $*" | tee -a "${LOG_FILE}"; }
 if [[ -f "${LOG_FILE}" ]]; then
   LINE_COUNT=$(wc -l <"${LOG_FILE}" 2>/dev/null || echo 0)
   if (( LINE_COUNT > MAX_LOG_LINES )); then
-    TMPFILE=$(mktemp)
+    TMPFILE=$(mktemp "${LOG_FILE}.XXXXXX")
+    trap 'rm -f "${TMPFILE}"' EXIT
     tail -n 200 "${LOG_FILE}" >"${TMPFILE}"
-    mv "${TMPFILE}" "${LOG_FILE}"
+    mv -f "${TMPFILE}" "${LOG_FILE}"
+    trap - EXIT
   fi
 fi
 

@@ -411,7 +411,8 @@ const AGENT_TOOLS = [
 
 function expandPath(p) {
   if (p.startsWith('~/')) {
-    return nodePath.join(process.env.HOME || '/root', p.slice(2));
+    const home = process.env.HOME || require('os').homedir();
+    return nodePath.join(home, p.slice(2));
   }
   return p;
 }
@@ -474,8 +475,15 @@ async function executeTool(name, input) {
       }
 
       case 'check_thermal': {
+        // Uses pure shell arithmetic — no bc dependency
         const { stdout } = await execAsync(
-          'for z in /sys/class/thermal/thermal_zone*; do name=$(cat "$z/type" 2>/dev/null); temp=$(cat "$z/temp" 2>/dev/null); printf "%s: %.1f°C\\n" "$name" "$(echo "$temp / 1000" | bc -l)"; done',
+          'for z in /sys/class/thermal/thermal_zone*; do ' +
+            'name=$(cat "$z/type" 2>/dev/null); ' +
+            'temp=$(cat "$z/temp" 2>/dev/null); ' +
+            '[ -z "$temp" ] && continue; ' +
+            'int=$(( temp / 1000 )); dec=$(( (temp % 1000) / 100 )); ' +
+            'printf "%s: %d.%d°C\\n" "$name" "$int" "$dec"; ' +
+          'done',
           { timeout: 5000 }
         );
         return stdout || 'No thermal zones found.';
