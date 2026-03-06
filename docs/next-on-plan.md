@@ -82,7 +82,20 @@ curl http://100.78.73.64:3456/metrics
     - targets: ['100.78.73.64:3456']
 ```
 
-Run Grafana in the homelab stack (`homelab/docker-compose.yml`) for dashboards.
+Grafana is **not** in `homelab/docker-compose.yml` by default (memory headroom on 12 GB RAM). To add it, append to the compose file:
+
+```yaml
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+```
+
+And add `grafana_data:` under the top-level `volumes:` key. Then add Prometheus as a data source pointing at `http://100.78.73.64:3456/metrics`.
 
 ---
 

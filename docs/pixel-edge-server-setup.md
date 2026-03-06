@@ -101,6 +101,8 @@ Your Pixel now runs a **Claude Opus 4.6 inference server** — OpenAI-compatible
 | Gateway port | `3456` |
 | Chat endpoint | `POST http://100.78.73.64:3456/v1/chat/completions` |
 | Agent endpoint | `POST http://100.78.73.64:3456/v1/agent` |
+| Streaming agent | `POST http://100.78.73.64:3456/v1/agent/stream` |
+| Metrics | `GET  http://100.78.73.64:3456/metrics` |
 | Health check | `GET  http://100.78.73.64:3456/health` |
 
 **Deploy:**
@@ -111,8 +113,32 @@ export ANTHROPIC_API_KEY=sk-ant-...
 ./scripts/setup-claude-heartbeat.sh        # AI health monitor every 30 min
 ```
 
+**Key config vars** (`~/.config/claude-gateway/.env` on VM):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ANTHROPIC_API_KEY` | required | Your Anthropic key |
+| `CLAUDE_MODEL` | `claude-opus-4-6` | Model for chat + agent |
+| `GATEWAY_API_KEY` | unset | Require Bearer token on all endpoints |
+| `RATE_LIMIT_RPM` | `60` | Per-IP rate limit (0 = disabled) |
+| `LOCAL_LLM_URL` | unset | Route `local`/`haiku/*` requests to on-device LLM |
+
 See **[docs/claude-gateway.md](claude-gateway.md)** for full usage, examples, and architecture.
+
+## On-device LLM (zero API cost)
+
+Two options — both set `LOCAL_LLM_URL` so the gateway routes free to on-device:
+
+```bash
+# Option A: llama.cpp with ARM SVE (fastest, ~12–16 tok/s on 3B)
+./scripts/setup-llama-sve.sh
+
+# Option B: Ollama + Jellyfin + NGINX homelab stack
+./scripts/setup-homelab.sh
+```
+
+See **[docs/local-llm-in-vm.md](local-llm-in-vm.md)**, **[docs/llama-server.md](llama-server.md)**, and **[docs/homelab.md](homelab.md)**.
 
 ## Next on the plan
 
-See **[docs/next-on-plan.md](next-on-plan.md)** for what’s remaining: VNC desktop, local LLM in the VM, hybrid NPU inference, 16KB pages, and homelab containers. Use **scripts/setup-vnc-in-vm.sh** to install a VNC + Xfce desktop in the VM.
+See **[docs/next-on-plan.md](next-on-plan.md)** for remaining items: VNC desktop, hybrid NPU inference, Prometheus/Grafana monitoring, and 16KB pages.

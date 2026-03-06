@@ -31,7 +31,7 @@ Use the Tensor NPU on the **Android host** for inference while the agent and too
 ## References
 
 - [MediaPipe LLM Inference - Android](https://ai.google.dev/edge/mediapipe/solutions/genai/llm_inference/android)
-- [Bridging Android 16 AVF & Tensor G4: NPU Access from Debian VM](https://www.reddit.com/r/Android/comments/1r1nucx/) (concept applies to Tensor G3 as well)
 - Android 16 / AVF docs for “custom VM” or “host-guest networking” to confirm the correct address and method for the VM to reach the host.
+- [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) — if implementing the bridge in the VM with CPU fallback
 
 This doc is a roadmap; implement the host inference app and VM-side bridge to match your chosen host API.
