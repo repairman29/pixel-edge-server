@@ -102,8 +102,12 @@ Can improve memory efficiency for VM workloads.
 
 | Goal | Command |
 |------|---------|
+| Deploy watchdog (2-min self-heal) | `bash scripts/setup-watchdog.sh` |
+| Deploy OpenClaw orchestrator (10-min AI management) | `bash scripts/setup-openclaw-orchestrator.sh` |
+| Deploy Claude heartbeat (30-min AI diagnostic) | `bash scripts/setup-claude-heartbeat.sh` |
 | Enable on-device LLM (llama.cpp, SVE-optimized) | `bash scripts/setup-llama-sve.sh` |
 | Start full homelab (Ollama + Jellyfin + NGINX) | `bash scripts/setup-homelab.sh` |
 | Enable VNC desktop | `bash scripts/setup-vnc-in-vm.sh` |
+| Check system status (from Mac) | `ssh -p 8022 droid@100.78.73.64 'cat ~/openclaw-orchestrator/status.md'` |
 | Prometheus metrics | `curl http://100.78.73.64:3456/metrics` |
-| Stream a live agent task | `curl -s -XPOST .../v1/agent/stream ...` |
+| List all timers | `ssh -p 8022 droid@100.78.73.64 'systemctl --user list-timers'` |
