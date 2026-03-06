@@ -33,8 +33,8 @@ GATEWAY_UP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "${GATEWAY_URL}
 
 # ── Build the task for Claude ─────────────────────────────────────────────────
 TASK=$(cat << EOF
-You are the autonomous health monitor for a Google Pixel 8 Pro running as an edge AI server.
-Analyze the current system state and report concisely.
+You are the autonomous health monitor AND system operator for a Google Pixel 8 Pro
+running as an edge AI server. Your job is to diagnose, FIX, and then report.
 
 Pre-collected metrics:
   uptime:         ${UPTIME}
@@ -45,16 +45,22 @@ Pre-collected metrics:
   docker running: ${DOCKER_RUNNING}
   gateway /health: HTTP ${GATEWAY_UP}
 
-Tasks:
-1. Use run_shell to check if the claude-gateway systemd user service is active.
-2. Use check_thermal to get all thermal readings and flag anything above 75°C as a warning.
-3. Use list_processes to identify any runaway CPU consumers (>80% for a single process).
-4. Use check_network to confirm port 3456 (gateway) and 18789 (OpenClaw) are listening.
-5. Produce a short HEARTBEAT REPORT:
+Tasks (complete all before writing the report):
+1. Check claude-gateway service: run_shell("systemctl --user status claude-gateway --no-pager -l")
+   - If not active, restart it: restart_service("claude-gateway") then verify.
+2. Check openclaw-gateway service: run_shell("systemctl --user status openclaw-gateway --no-pager -l")
+   - If not active, restart it: restart_service("openclaw-gateway") then verify.
+3. Check ports: check_network — confirm 3456 and 18789 are listening.
+   - If a port is missing after a restart, note it as CRITICAL.
+4. Check thermals: check_thermal — flag anything above 75°C as WARNING, above 85°C as CRITICAL.
+5. Check processes: list_processes — flag any single process using >80% CPU.
+6. Check disk: check_disk — flag if / is above 85% used.
+7. Produce a HEARTBEAT REPORT:
    - STATUS: OK | WARNING | CRITICAL
-   - One-line summary of health
-   - Bullet list of any issues found (or "No issues found." if clean)
-   - Recommended action if STATUS is not OK
+   - One-line summary
+   - Bullet list of findings (services checked, actions taken, resource warnings)
+   - If any service was restarted, note it explicitly: "• Restarted <name> (was <state>)"
+   - If STATUS is not OK, include a recommended next action
 EOF
 )
 
@@ -79,7 +85,7 @@ log "Submitting health task to Claude (model: claude-opus-4-6)..."
 RESPONSE=$(curl -s -X POST "${GATEWAY_URL}/v1/agent" \
   -H "Content-Type: application/json" \
   --max-time 120 \
-  -d "$(jq -n --arg task "${TASK}" '{task: $task, max_turns: 12}')" 2>/dev/null)
+  -d "$(jq -n --arg task "${TASK}" '{task: $task, max_turns: 16}')" 2>/dev/null)
 
 if [[ -z "${RESPONSE}" ]]; then
   log "ERROR: Empty response from gateway."
