@@ -6,28 +6,23 @@
 
 set -euo pipefail
 
-VM_HOST="${1:-droid@100.78.73.64}"
-VM_SSH="ssh -p 8022 ${VM_HOST}"
-VM_SCP="scp -P 8022"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "╔══════════════════════════════════════════╗"
-echo "║  Claude Heartbeat — Install to Pixel VM  ║"
-echo "╚══════════════════════════════════════════╝"
-echo "Target: ${VM_HOST}"
-echo ""
+vm_banner "Claude Heartbeat — Install to Pixel VM"
 
 # ── Copy the heartbeat script ──────────────────────────────────────────────────
 echo "→ Copying claude-heartbeat.sh to VM..."
-$VM_SCP scripts/claude-heartbeat.sh "${VM_HOST}:~/claude-gateway/claude-heartbeat.sh"
-$VM_SSH "chmod +x ~/claude-gateway/claude-heartbeat.sh"
+vm_scp scripts/claude-heartbeat.sh "~/claude-gateway/claude-heartbeat.sh"
+vm_ssh "chmod +x ~/claude-gateway/claude-heartbeat.sh"
 
 # ── Ensure jq is installed (needed for JSON parsing in the script) ─────────────
 echo "→ Ensuring jq is installed..."
-$VM_SSH "which jq > /dev/null 2>&1 || sudo apt-get install -y jq"
+vm_ssh "which jq > /dev/null 2>&1 || sudo apt-get install -y jq"
 
 # ── Install cron job (every 30 minutes) ───────────────────────────────────────
 echo "→ Installing cron job (every 30 minutes)..."
-$VM_SSH '
+vm_ssh '
   # Remove any existing claude-heartbeat cron entries
   (crontab -l 2>/dev/null | grep -v "claude-heartbeat") | crontab -
 
@@ -41,13 +36,13 @@ $VM_SSH '
 # ── Run a one-shot test ────────────────────────────────────────────────────────
 echo ""
 echo "→ Running a one-shot heartbeat (this takes ~60 s for Claude to analyze)..."
-$VM_SSH "source ~/.config/claude-gateway/.env 2>/dev/null; bash ~/claude-gateway/claude-heartbeat.sh" || {
+vm_ssh "source ~/.config/claude-gateway/.env 2>/dev/null; bash ~/claude-gateway/claude-heartbeat.sh" || {
   echo "  (heartbeat errored — check ~/claude-gateway/heartbeat.log on the VM)"
 }
 
 echo ""
 echo "✓ Claude Heartbeat installed."
 echo ""
-echo "  View latest report:  ssh -p 8022 ${VM_HOST} 'tail -50 ~/claude-gateway/heartbeat.log'"
-echo "  Run manually:        ssh -p 8022 ${VM_HOST} 'bash ~/claude-gateway/claude-heartbeat.sh'"
+echo "  View latest report:  ssh -p ${VM_PORT} ${VM_HOST} 'tail -50 ~/claude-gateway/heartbeat.log'"
+echo "  Run manually:        ssh -p ${VM_PORT} ${VM_HOST} 'bash ~/claude-gateway/claude-heartbeat.sh'"
 echo "  Cron schedule:       every 30 min (:00 and :30)"

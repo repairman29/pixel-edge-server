@@ -9,15 +9,10 @@
 
 set -euo pipefail
 
-VM_HOST="${1:-droid@100.78.73.64}"
-VM_SSH="ssh -p 8022 ${VM_HOST}"
-VM_SCP="scp -P 8022"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "╔══════════════════════════════════════════╗"
-echo "║  Claude Gateway — Deploy to Pixel VM     ║"
-echo "╚══════════════════════════════════════════╝"
-echo "Target: ${VM_HOST}"
-echo ""
+vm_banner "Claude Gateway — Deploy to Pixel VM"
 
 # ── 1. Confirm ANTHROPIC_API_KEY is available ──────────────────────────────────
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
@@ -28,16 +23,16 @@ fi
 
 # ── 2. Create directory structure in the VM ───────────────────────────────────
 echo "→ Creating ~/claude-gateway on the VM..."
-$VM_SSH "mkdir -p ~/claude-gateway ~/.config/claude-gateway"
+vm_ssh "mkdir -p ~/claude-gateway ~/.config/claude-gateway"
 
 # ── 3. Copy source files to the VM ────────────────────────────────────────────
 echo "→ Copying server files..."
-$VM_SCP claude-gateway/package.json "${VM_HOST}:~/claude-gateway/package.json"
-$VM_SCP claude-gateway/server.js    "${VM_HOST}:~/claude-gateway/server.js"
+vm_scp claude-gateway/package.json "~/claude-gateway/package.json"
+vm_scp claude-gateway/server.js    "~/claude-gateway/server.js"
 
 # ── 4. Write .env file on the VM ──────────────────────────────────────────────
 echo "→ Writing .env..."
-$VM_SSH "cat > ~/.config/claude-gateway/.env" << EOF
+vm_ssh "cat > ~/.config/claude-gateway/.env" << EOF
 # Claude Gateway environment
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-REPLACE_ME}
 CLAUDE_GATEWAY_PORT=3456
@@ -46,7 +41,7 @@ EOF
 
 # ── 5. Install dependencies in the VM ─────────────────────────────────────────
 echo "→ Installing npm dependencies in the VM (this takes ~30 s on first run)..."
-$VM_SSH "cd ~/claude-gateway && npm install --omit=dev"
+vm_ssh "cd ~/claude-gateway && npm install --omit=dev"
 
 # ── 6. Quick smoke-test ────────────────────────────────────────────────────────
 echo ""
@@ -55,6 +50,6 @@ echo "   Or open a second terminal and run:"
 echo "   curl http://100.78.73.64:3456/health"
 echo ""
 
-$VM_SSH "cd ~/claude-gateway && \
+vm_ssh "cd ~/claude-gateway && \
   export \$(cat ~/.config/claude-gateway/.env | grep -v '^#' | xargs) && \
   node server.js"

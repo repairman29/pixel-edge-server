@@ -17,28 +17,21 @@
 
 set -euo pipefail
 
-PIXEL_HOST="${PIXEL_HOST:-droid@100.78.73.64}"
-PIXEL_PORT="${PIXEL_PORT:-8022}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-SSH="ssh -p ${PIXEL_PORT} ${PIXEL_HOST}"
-SCP="scp -P ${PIXEL_PORT}"
-
-echo "╔══════════════════════════════════════════════╗"
-echo "║   OpenClaw Orchestrator — setup              ║"
-echo "╚══════════════════════════════════════════════╝"
-echo "  Target : ${PIXEL_HOST}:${PIXEL_PORT}"
-echo ""
+vm_banner "OpenClaw Orchestrator — setup"
 
 # ── Deploy orchestrator script ────────────────────────────────────────────────
 echo "==> [1/3] Deploying openclaw-orchestrator.sh to VM ~/bin/..."
-$SSH mkdir -p ~/bin ~/openclaw-orchestrator
-$SCP "$(dirname "$0")/openclaw-orchestrator.sh" "${PIXEL_HOST}:~/bin/openclaw-orchestrator.sh"
-$SSH chmod +x ~/bin/openclaw-orchestrator.sh
+vm_ssh "mkdir -p ~/bin ~/openclaw-orchestrator"
+vm_scp "${SCRIPT_DIR}/openclaw-orchestrator.sh" "~/bin/openclaw-orchestrator.sh"
+vm_ssh chmod +x ~/bin/openclaw-orchestrator.sh
 
 # ── Install systemd service + timer ───────────────────────────────────────────
 echo "==> [2/3] Installing systemd user timer (every 10 min)..."
 
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 set -euo pipefail
 mkdir -p ~/.config/systemd/user
 
@@ -84,7 +77,7 @@ echo "==> [3/3] Running first orchestrator cycle (this takes ~60-90s)..."
 echo "  (Claude will check all services, fix any issues, write status.md)"
 echo ""
 
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 if ! curl -sf http://127.0.0.1:3456/health >/dev/null 2>&1; then
   echo "  WARN: Claude Gateway not reachable — skipping test run."
   echo "  Start the gateway first: systemctl --user start claude-gateway"
@@ -111,5 +104,5 @@ echo "    ~/openclaw-orchestrator/status.md   ← current system state"
 echo "    ~/openclaw-orchestrator/orchestrator.log ← run history"
 echo ""
 echo "  Check status from Mac:"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'cat ~/openclaw-orchestrator/status.md'"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'tail -30 ~/openclaw-orchestrator/orchestrator.log'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'cat ~/openclaw-orchestrator/status.md'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'tail -30 ~/openclaw-orchestrator/orchestrator.log'"

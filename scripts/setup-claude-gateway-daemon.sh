@@ -6,18 +6,14 @@
 
 set -euo pipefail
 
-VM_HOST="${1:-droid@100.78.73.64}"
-VM_SSH="ssh -p 8022 ${VM_HOST}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "╔══════════════════════════════════════════╗"
-echo "║  Claude Gateway — Install systemd daemon ║"
-echo "╚══════════════════════════════════════════╝"
-echo "Target: ${VM_HOST}"
-echo ""
+vm_banner "Claude Gateway — systemd daemon"
 
 # ── Write the systemd unit ────────────────────────────────────────────────────
 echo "→ Writing ~/.config/systemd/user/claude-gateway.service..."
-$VM_SSH "mkdir -p ~/.config/systemd/user && cat > ~/.config/systemd/user/claude-gateway.service" << 'UNIT'
+vm_ssh "mkdir -p ~/.config/systemd/user && cat > ~/.config/systemd/user/claude-gateway.service" << 'UNIT'
 [Unit]
 Description=Claude Gateway — OpenAI-compatible Claude API for Pixel AI Server
 After=network-online.target
@@ -39,7 +35,7 @@ UNIT
 
 # ── Enable & (re)start ────────────────────────────────────────────────────────
 echo "→ Enabling and starting claude-gateway.service..."
-$VM_SSH "
+vm_ssh "
   export XDG_RUNTIME_DIR=/run/user/\$(id -u)
   systemctl --user daemon-reload
   systemctl --user enable claude-gateway
@@ -52,9 +48,9 @@ $VM_SSH "
 echo ""
 echo "✓ Claude Gateway is running as a persistent systemd user service."
 echo ""
-echo "  Check status:  ssh -p 8022 ${VM_HOST} 'systemctl --user status claude-gateway'"
-echo "  View logs:     ssh -p 8022 ${VM_HOST} 'journalctl --user -u claude-gateway -f'"
-echo "  Stop:          ssh -p 8022 ${VM_HOST} 'systemctl --user stop claude-gateway'"
+echo "  Check status:  ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user status claude-gateway'"
+echo "  View logs:     ssh -p ${VM_PORT} ${VM_HOST} 'journalctl --user -u claude-gateway -f'"
+echo "  Stop:          ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user stop claude-gateway'"
 echo ""
 echo "  Health check (via Tailscale): curl http://100.78.73.64:3456/health"
 echo ""

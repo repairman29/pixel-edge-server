@@ -87,22 +87,26 @@ The agent runs with the same privileges as the `droid` user in the VM; keep your
 
 ---
 
-## 7. Gateway health-checks (self-heal)
+## 7. Health monitoring & self-heal (3 layers)
 
-Two layers of self-healing are available:
+Three layers of resilience keep the stack running autonomously:
 
-**OpenClaw healthcheck** (port 18789 — legacy) — runs every 5 min via systemd timer; restarts OpenClaw if port 18789 goes dark.
+**Layer 1: Watchdog** (every 2 min, no AI) — checks all ports (3456, 18789, 8080, 11434, 8096) and Docker containers. Restarts anything dead, verifies recovery.
 
 ```bash
-./scripts/setup-gateway-healthcheck.sh   # install from Mac
+bash scripts/setup-watchdog.sh            # install from Mac
 # Log:
-ssh -p 8022 droid@100.78.73.64 'tail ~/openclaw-heartbeat/gateway-healthcheck.log'
+ssh -p 8022 droid@100.78.73.64 'tail ~/watchdog/watchdog.log'
 ```
 
-**Claude Gateway daemon** (port 3456) — the systemd service installed by `setup-claude-gateway-daemon.sh` already has `Restart=on-failure`, so the gateway recovers automatically without a separate timer. Verify with:
+**Layer 2: OpenClaw orchestrator** (every 10 min, AI-driven) — OpenClaw dispatches a full management task to Claude Gateway `/v1/agent`. Claude checks services, restarts failures, monitors thermal/disk/memory, rotates logs, and writes a structured status file.
 
 ```bash
-ssh -p 8022 droid@100.78.73.64 'systemctl --user status claude-gateway'
+bash scripts/setup-openclaw-orchestrator.sh   # install from Mac
+# Status:
+ssh -p 8022 droid@100.78.73.64 'cat ~/openclaw-orchestrator/status.md'
 ```
 
-**Claude Gateway AI heartbeat** — Claude itself runs every 30 min, checks thermals, disk, and services, and writes a report. Install with `./scripts/setup-claude-heartbeat.sh`. See **[docs/claude-gateway.md](claude-gateway.md)** → AI Heartbeat section.
+**Layer 3: Claude heartbeat** (every 30 min, AI diagnostic) — deeper analysis with remediation authority. Install with `./scripts/setup-claude-heartbeat.sh`. See **[docs/claude-gateway.md](claude-gateway.md)** → AI Heartbeat section.
+
+All systemd services also have `Restart=on-failure` (Claude Gateway) or `Restart=always` (OpenClaw) as a baseline.

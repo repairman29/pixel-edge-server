@@ -13,28 +13,21 @@
 
 set -euo pipefail
 
-PIXEL_HOST="${PIXEL_HOST:-droid@100.78.73.64}"
-PIXEL_PORT="${PIXEL_PORT:-8022}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-SSH="ssh -p ${PIXEL_PORT} ${PIXEL_HOST}"
-SCP="scp -P ${PIXEL_PORT}"
-
-echo "╔══════════════════════════════════════════════╗"
-echo "║       Watchdog setup — Pixel VM              ║"
-echo "╚══════════════════════════════════════════════╝"
-echo "  Target : ${PIXEL_HOST}:${PIXEL_PORT}"
-echo ""
+vm_banner "Watchdog setup — Pixel VM"
 
 # ── Deploy script ─────────────────────────────────────────────────────────────
 echo "==> [1/3] Deploying watchdog.sh to VM ~/bin/..."
-$SSH mkdir -p ~/bin
-$SCP "$(dirname "$0")/watchdog.sh" "${PIXEL_HOST}:~/bin/watchdog.sh"
-$SSH chmod +x ~/bin/watchdog.sh
+vm_ssh mkdir -p ~/bin
+vm_scp "${SCRIPT_DIR}/watchdog.sh" "~/bin/watchdog.sh"
+vm_ssh chmod +x ~/bin/watchdog.sh
 
 # ── Install systemd timer (every 2 minutes) ───────────────────────────────────
 echo "==> [2/3] Installing systemd user timer (every 2 min)..."
 
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 set -euo pipefail
 mkdir -p ~/.config/systemd/user
 
@@ -76,7 +69,7 @@ REMOTE
 # ── Optional: disable the old gateway-healthcheck timer ──────────────────────
 echo "==> [3/3] Checking for old gateway-healthcheck timer..."
 
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 if systemctl --user is-enabled gateway-healthcheck.timer &>/dev/null; then
   echo "  Disabling old gateway-healthcheck.timer (superseded by watchdog)..."
   systemctl --user disable --now gateway-healthcheck.timer 2>/dev/null || true
@@ -97,5 +90,5 @@ echo "                 llama-server (8080 if installed), ollama + jellyfin (if D
 echo "  Log:           ~/watchdog/watchdog.log"
 echo ""
 echo "  Verify:"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'systemctl --user list-timers watchdog.timer'"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'tail -20 ~/watchdog/watchdog.log'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user list-timers watchdog.timer'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'tail -20 ~/watchdog/watchdog.log'"

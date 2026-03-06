@@ -19,6 +19,9 @@ What's done vs what's left from the Android 16 edge-server roadmap.
 | **Claude Gateway v2** | **Done** — Prometheus metrics, rate limiting, Bearer auth, 4 new agent tools (`read_file`, `write_file`, `restart_service`, `http_fetch`), streaming agent SSE endpoint (`/v1/agent/stream`), local LLM routing |
 | **llama.cpp SVE build automation** | **Done** (`scripts/setup-llama-sve.sh`) — ARM SVE optimized, systemd service, auto-links to Claude Gateway |
 | **Homelab Docker stack** | **Done** (`homelab/docker-compose.yml`, `scripts/setup-homelab.sh`) — Ollama + Jellyfin + NGINX reverse proxy |
+| **3-layer watchdog + orchestrator** | **Done** — watchdog (2 min, no AI, all ports + Docker), OpenClaw orchestrator (10 min, AI-driven management via `/v1/agent`), heartbeat upgraded to remediative |
+| **SSH helper consolidation** | **Done** — `scripts/lib/vm-common.sh` sourced by all setup scripts |
+| **Dead code cleanup** | **Done** — removed `setup-local-llm.sh`, `npu-bridge.sh`, `setup-npu-bridge.sh`, `setup-heartbeat.sh`, `gateway-healthcheck.sh`, `setup-gateway-healthcheck.sh`, `docs/hybrid-npu-inference.md` |
 
 ---
 
@@ -55,20 +58,7 @@ See `docs/local-llm-in-vm.md` for detail on both backends.
 
 ---
 
-### 3. Hybrid NPU inference (VM + Android host)
-
-Use the Tensor G3 NPU on the Android host while the agent runs in the VM.
-
-- **Android host:** Install an app that runs MediaPipe LLM Inference and accepts prompts
-  (local API or `adb shell`)
-- **VM bridge:** `adb connect 127.0.0.1:5555`, then call the host-side inference API
-
-See `scripts/npu-bridge.sh` (stub, needs host-side implementation) and
-`docs/hybrid-npu-inference.md`.
-
----
-
-### 4. Prometheus + Grafana monitoring (optional)
+### 3. Prometheus + Grafana monitoring (optional)
 
 Claude Gateway v2 exposes `/metrics` in Prometheus format.
 
@@ -99,7 +89,7 @@ And add `grafana_data:` under the top-level `volumes:` key. Then add Prometheus 
 
 ---
 
-### 5. 16KB memory pages (optional, destructive)
+### 4. 16KB memory pages (optional, destructive)
 
 Can improve memory efficiency for VM workloads.
 
