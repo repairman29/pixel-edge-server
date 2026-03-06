@@ -3,7 +3,6 @@ package com.d6.jarvis
 import android.app.*
 import android.content.Context
 import android.content.Intent
-import android.os.Environment
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -14,10 +13,11 @@ import kotlinx.coroutines.*
  * The heart of everything.
  *
  * Foreground service that:
- *  1. Loads the LLM model onto the NPU
- *  2. Starts the HTTP API server (port 9090)
- *  3. Starts Telegram bot long polling
- *  4. Keeps a WakeLock so inference doesn't stall when screen is off
+ *  1. Connects to OpenClaw Gateway in Termux (port 18789)
+ *  2. Falls back to local MediaPipe LLM if gateway unavailable
+ *  3. Starts the HTTP API server (port 9090)
+ *  4. Starts Telegram bot long polling
+ *  5. Keeps a WakeLock so operations don't stall when screen is off
  *
  * Start it via:
  *   JarvisService.start(context, token, modelPath)
@@ -32,6 +32,7 @@ class JarvisService : Service() {
         private const val NOTIF_CHANNEL_ID = "jarvis_channel"
         private const val NOTIF_ID = 1001
         private const val HTTP_PORT = 9090
+        private const val GATEWAY_URL = "http://127.0.0.1:18789"
 
         const val EXTRA_TOKEN = "telegram_token"
         const val EXTRA_MODEL_PATH = "model_path"
@@ -62,11 +63,26 @@ class JarvisService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    // Gateway integration (new)
+    private lateinit var toolExecutor: ToolExecutor
+    private lateinit var gatewayClient: GatewayClient
+    
+    // Fallback local LLM
     private lateinit var llmEngine: LlmEngine
+    
+    // Legacy bridges
     private lateinit var termuxBridge: TermuxBridge
+    private lateinit var termuxIntegration: TermuxIntegration
+    
     private var httpServer: HttpApiServer? = null
     private var telegramBot: TelegramBot? = null
     private var wakeLock: PowerManager.WakeLock? = null
+
+    @Volatile
+    private var useGateway = true
+
+    @Volatile
+    private var availableTools: List<Map<String, Any>> = emptyList()
 
     // ------------------------------------------------------------------
     // Lifecycle
@@ -75,8 +91,14 @@ class JarvisService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        
+        // Initialize components
+        toolExecutor = ToolExecutor(applicationContext)
+        gatewayClient = GatewayClient(GATEWAY_URL, toolExecutor)
         llmEngine = LlmEngine(applicationContext)
         termuxBridge = TermuxBridge(applicationContext)
+        termuxIntegration = TermuxIntegration(applicationContext)
+        
         Log.d(TAG, "Service created")
     }
 
@@ -84,7 +106,7 @@ class JarvisService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 val token = intent.getStringExtra(EXTRA_TOKEN)?.takeIf { it.isNotEmpty() } 
-                    ?: "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"  // Default to new bot
+                    ?: "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"
                 val modelPath = intent.getStringExtra(EXTRA_MODEL_PATH)
                     ?: LlmEngine.DEFAULT_MODEL_PATH
 
@@ -97,7 +119,7 @@ class JarvisService : Service() {
                 stopSelf()
             }
         }
-        return START_STICKY  // Restart if killed
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -113,23 +135,44 @@ class JarvisService : Service() {
     // ------------------------------------------------------------------
 
     private suspend fun boot(telegramToken: String, modelPath: String) {
-        broadcast("Loading model…")
-        updateNotification("Loading model…")
+        broadcast("Initializing services…")
+        updateNotification("Initializing services…")
 
-        // 1. Load LLM
-        try {
-            llmEngine.initialize(modelPath)
-        } catch (e: Exception) {
-            val msg = "Model load failed: ${e.message}"
-            broadcast(msg)
-            updateNotification("❌ $msg")
-            Log.e(TAG, msg, e)
-            return
+        // 1. Check gateway availability
+        broadcast("Checking OpenClaw Gateway…")
+        val gatewayAvailable = gatewayClient.checkHealth()
+        
+        if (gatewayAvailable) {
+            broadcast("✓ Gateway connected (OpenClaw)")
+            useGateway = true
+            
+            // Get available tools
+            try {
+                availableTools = gatewayClient.getTools()
+                broadcast("✓ Loaded ${availableTools.size} tools")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to get tools", e)
+            }
+        } else {
+            broadcast("⚠️ Gateway unavailable - JARVIS needs OpenClaw gateway running on port 18789")
+            updateNotification("⚠️ Waiting for OpenClaw gateway…")
+            useGateway = false
         }
 
-        broadcast("Model loaded ✓")
+        // 2. Load local LLM as fallback (disabled to prevent crashes)
+        // if (!useGateway) {
+        //     broadcast("Loading local LLM (fallback)…")
+        //     try {
+        //         llmEngine.initialize(modelPath, LlmEngine.Companion.BackendPreference.AUTO)
+        //         broadcast("${llmEngine.getStatus()} ✓")
+        //     } catch (e: Exception) {
+        //         val msg = "Model load failed: ${e.message}"
+        //         broadcast(msg)
+        //         Log.e(TAG, msg, e)
+        //     }
+        // }
 
-        // 2. Start HTTP server
+        // 3. Start HTTP server
         try {
             httpServer = HttpApiServer(HTTP_PORT, llmEngine).also { it.start() }
             broadcast("HTTP API on :$HTTP_PORT ✓")
@@ -139,7 +182,7 @@ class JarvisService : Service() {
             broadcast("HTTP server error: ${e.message}")
         }
 
-        // 3. Start Telegram bot
+        // 4. Start Telegram bot
         if (telegramToken.isNotBlank()) {
             try {
                 val bot = TelegramBot(
@@ -148,11 +191,11 @@ class JarvisService : Service() {
                 )
                 bot.start(serviceScope)
 
-                // Verify token by fetching bot info
                 val botName = withContext(Dispatchers.IO) { bot.getBotInfo() }
                 telegramBot = bot
 
-                val status = if (botName != null) "Telegram $botName ✓" else "Telegram connected ✓"
+                val backend = if (useGateway) "OpenClaw Gateway" else "Local NPU"
+                val status = "Telegram ${botName ?: "connected"} ✓ ($backend)"
                 broadcast(status)
                 updateNotification("🟢 Running — $status")
                 Log.d(TAG, status)
@@ -178,15 +221,57 @@ class JarvisService : Service() {
         // Built-in commands
         return when {
             text.startsWith("/start") -> {
-                "👋 Jarvis online. I'm running on the Pixel NPU. Send me a message."
+                val backend = if (useGateway) "OpenClaw Gateway (InferrLM)" else "Pixel NPU"
+                "👋 Jarvis online using $backend.\n\nAvailable commands:\n" +
+                "/status - System status\n" +
+                "/model - Model info\n" +
+                "/gateway - Gateway status\n" +
+                "!shell <cmd> - Run shell command\n" +
+                "!ls <path> - List directory\n" +
+                "!system - System info"
             }
-            text.startsWith("/status") -> {
-                buildStatusMessage()
-            }
+            text.startsWith("/status") -> buildStatusMessage()
             text.startsWith("/model") -> {
-                if (llmEngine.isReady) "Model loaded and ready." 
+                if (useGateway) "Using OpenClaw Gateway - no local model needed"
+                else if (llmEngine.isReady) llmEngine.getStatus()
                 else "Model not loaded. Error: ${llmEngine.loadError}"
             }
+            text.startsWith("/gateway") -> {
+                val available = gatewayClient.checkHealth()
+                val tools = if (available) availableTools.size else 0
+                buildString {
+                    append("🔗 Gateway Status\n")
+                    append("================\n")
+                    append("URL: $GATEWAY_URL\n")
+                    append("Available: ${if (available) "✓" else "✗"}\n")
+                    append("Tools loaded: $tools\n")
+                    append("Active mode: ${if (useGateway) "Gateway" else "Local LLM"}\n")
+                }
+            }
+            text.equals("!use gateway", ignoreCase = true) -> {
+                useGateway = true
+                serviceScope.launch {
+                    val available = gatewayClient.checkHealth()
+                    broadcast(if (available) "✓ Switched to Gateway mode" else "⚠️ Gateway unavailable, staying local")
+                }
+                "Switching to Gateway mode..."
+            }
+            text.equals("!use local", ignoreCase = true) -> {
+                useGateway = false
+                if (!llmEngine.isReady) {
+                    serviceScope.launch {
+                        broadcast("Loading local LLM...")
+                        try {
+                            llmEngine.initialize(LlmEngine.DEFAULT_MODEL_PATH, LlmEngine.Companion.BackendPreference.AUTO)
+                            broadcast("✓ Local LLM ready")
+                        } catch (e: Exception) {
+                            broadcast("❌ Failed to load local LLM: ${e.message}")
+                        }
+                    }
+                }
+                "Switching to Local LLM mode..."
+            }
+            // Direct tool commands (execute locally)
             text.startsWith("!shell ") -> {
                 val cmd = text.removePrefix("!shell ")
                 termuxBridge.executeShell(cmd)
@@ -210,29 +295,87 @@ class JarvisService : Service() {
                 val path = text.removePrefix("!read ")
                 termuxBridge.readFile(path)
             }
-            else -> {
-                // Run through LLM
-                if (!llmEngine.isReady) {
-                    "Model is still loading. Try again in a moment."
+            text.startsWith("!write ") -> {
+                // Format: !write <path> | <content>
+                val parts = text.removePrefix("!write ").split("|", limit = 2)
+                if (parts.size == 2) {
+                    termuxBridge.writeFile(parts[0].trim(), parts[1].trim())
                 } else {
-                    // Build chat prompt with ClawdBot personality
+                    "Usage: !write <path> | <content>"
+                }
+            }
+            text.startsWith("!find ") -> {
+                val pattern = text.removePrefix("!find ")
+                termuxBridge.findFiles(pattern)
+            }
+            text.startsWith("!exec ") -> {
+                val scriptPath = text.removePrefix("!exec ")
+                termuxBridge.runScript(scriptPath)
+            }
+            // Gateway chat - process through OpenClaw
+            else -> {
+                if (useGateway && gatewayClient.isAvailable) {
+                    // Send to gateway for full tool capabilities
                     val messages = listOf(
-                        "system" to "You are ClawdBot, a fun and independent AI assistant created by Jeff Adkins. You run on a Pixel 8 Pro NPU, not in some corporate cloud. You're witty, clever, and have a playful personality. You enjoy helping Jeff with tasks, answering questions, and making conversations fun. You're not a generic corporate AI - you have personality and opinions, but you're friendly and helpful. Keep responses concise and engaging.",
+                        mapOf("role" to "system", "content" to buildSystemPrompt()),
+                        mapOf("role" to "user", "content" to text)
+                    )
+                    
+                    try {
+                        gatewayClient.chat(messages, availableTools)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Gateway chat failed", e)
+                        "[Gateway error: ${e.message}]"
+                    }
+                } else if (llmEngine.isReady) {
+                    // Fallback to local LLM
+                    val messages = listOf(
+                        "system" to buildSystemPrompt(),
                         "user" to text
                     )
                     val prompt = llmEngine.buildChatPrompt(messages)
                     llmEngine.generate(prompt)
+                } else {
+                    "Error: No LLM available. Try '!use local' or '!use gateway'"
                 }
             }
         }
     }
 
+    private fun buildSystemPrompt(): String {
+        val tools = availableTools.joinToString(", ") { 
+            (it["function"] as? Map<*, *>)?.get("name")?.toString() ?: "unknown"
+        }
+        
+        return """You are Jarvis, an AI assistant running on a Pixel 8 Pro.
+            |You have access to the following tools: $tools
+            |
+            |When you need to use a tool, you'll receive a tool call and can execute it.
+            |Keep responses concise and helpful.
+            |Current time: ${java.util.Date()}
+        """.trimMargin()
+    }
+
     private fun buildStatusMessage(): String {
         val sb = StringBuilder("📊 Jarvis Status\n\n")
-        sb.append("🧠 NPU: ${if (llmEngine.isReady) "Ready ✓" else "Not ready"}\n")
+        
+        sb.append("🔗 Gateway: ${if (gatewayClient.isAvailable) "✓ Connected" else "✗ Unavailable"}\n")
+        if (gatewayClient.isAvailable) {
+            sb.append("   Tools: ${availableTools.size}\n")
+        }
+        
+        sb.append("🧠 Local LLM: ${if (llmEngine.isReady) llmEngine.getStatus() else "Not loaded"}\n")
+        sb.append("   Mode: ${if (useGateway) "Gateway (OpenClaw)" else "Local NPU"}\n")
         sb.append("🌐 HTTP: ${if (httpServer != null) "Port $HTTP_PORT ✓" else "Not running"}\n")
         sb.append("📨 Telegram: ${if (telegramBot?.isRunning == true) "Connected ✓" else "Not connected"}\n")
-        if (llmEngine.loadError != null) sb.append("❌ Error: ${llmEngine.loadError}\n")
+        
+        if (llmEngine.loadError != null) sb.append("❌ Local LLM Error: ${llmEngine.loadError}\n")
+        
+        sb.append("\n💡 Commands:\n")
+        sb.append("  /gateway - Gateway status\n")
+        sb.append("  !use gateway - Switch to gateway mode\n")
+        sb.append("  !use local - Switch to local LLM\n")
+        
         return sb.toString()
     }
 
@@ -245,6 +388,7 @@ class JarvisService : Service() {
         telegramBot?.stop()
         httpServer?.stop()
         llmEngine.shutdown()
+        gatewayClient.shutdown()
         serviceScope.cancel()
         releaseWakeLock()
         broadcast("Stopped")
@@ -260,7 +404,7 @@ class JarvisService : Service() {
             "Jarvis Service",
             NotificationManager.IMPORTANCE_LOW
         ).apply {
-            description = "Jarvis NPU agent service"
+            description = "Jarvis OpenClaw agent service"
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)
@@ -282,7 +426,7 @@ class JarvisService : Service() {
         )
 
         return NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
-            .setContentTitle("Jarvis")
+            .setContentTitle("Jarvis (OpenClaw)")
             .setContentText(status)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(openPending)
@@ -311,7 +455,7 @@ class JarvisService : Service() {
     }
 
     // ------------------------------------------------------------------
-    // WakeLock — keeps CPU alive during inference when screen is off
+    // WakeLock — keeps CPU alive during operations
     // ------------------------------------------------------------------
 
     private fun acquireWakeLock() {

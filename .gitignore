@@ -25,3 +25,10 @@ gateway-crash-log.txt
 # External / large
 .cache/
 mediapipe-samples/
+
+# Android / Gradle (jarvis-android)
+jarvis-android/.gradle/
+jarvis-android/app/build/
+jarvis-android/build/
+jarvis-android.tar.gz
+*.apk

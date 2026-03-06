@@ -49,6 +49,7 @@ dependencies {
 
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     implementation 'com.google.mediapipe:tasks-genai:0.10.22'
+    // GPU delegate support is included in tasks-genai
     implementation 'org.nanohttpd:nanohttpd:2.3.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
