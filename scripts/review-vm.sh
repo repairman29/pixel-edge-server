@@ -7,13 +7,13 @@
 
 set -e
 
-SSH_OPTS="-p 8022 -o ConnectTimeout=10 -o StrictHostKeyChecking=no"
-TARGET="${1:-droid@127.0.0.1}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "=== Reviewing VM (${TARGET}) ==="
+echo "=== Reviewing VM (${VM_HOST}:${VM_PORT}) ==="
 echo ""
 
-run() { ssh $SSH_OPTS "$TARGET" "$@"; }
+run() { vm_ssh "$@"; }
 
 echo "--- System ---"
 run "uname -a" || true

@@ -19,19 +19,15 @@
 
 set -euo pipefail
 
-PIXEL_HOST="${PIXEL_HOST:-droid@100.78.73.64}"
-PIXEL_PORT="${PIXEL_PORT:-8022}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
+
 MODEL_URL="${MODEL_URL:-https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf}"
 MODEL_NAME="${MODEL_NAME:-Llama-3.2-3B-Instruct-Q4_K_M.gguf}"
 SERVE_PORT="${SERVE_PORT:-8080}"
 LINK_GATEWAY="${LINK_GATEWAY:-1}"
 
-SSH="ssh -p ${PIXEL_PORT} ${PIXEL_HOST}"
-
-echo "╔══════════════════════════════════════════════╗"
-echo "║   llama.cpp SVE build — Pixel Tensor G3      ║"
-echo "╚══════════════════════════════════════════════╝"
-echo "  Target : ${PIXEL_HOST} (port ${PIXEL_PORT})"
+vm_banner "llama.cpp SVE build — Pixel Tensor G3"
 echo "  Model  : ${MODEL_NAME}"
 echo "  Port   : ${SERVE_PORT}"
 echo ""
@@ -39,7 +35,7 @@ echo ""
 # ── Step 1: build llama.cpp ───────────────────────────────────────────────────
 echo "==> [1/4] Building llama.cpp with GGML_SVE=ON..."
 
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 set -euo pipefail
 
 # Install build dependencies
@@ -81,7 +77,7 @@ REMOTE
 echo ""
 echo "==> [2/4] Downloading model: ${MODEL_NAME}..."
 
-$SSH bash -s -- "${MODEL_URL}" "${MODEL_NAME}" <<'REMOTE'
+vm_ssh_heredoc -s -- "${MODEL_URL}" "${MODEL_NAME}" <<'REMOTE'
 MODEL_URL="$1"
 MODEL_NAME="$2"
 mkdir -p ~/llama-models
@@ -98,7 +94,7 @@ REMOTE
 echo ""
 echo "==> [3/4] Installing llama-server systemd service (port ${SERVE_PORT})..."
 
-$SSH bash -s -- "${SERVE_PORT}" "${MODEL_NAME}" <<'REMOTE'
+vm_ssh_heredoc -s -- "${SERVE_PORT}" "${MODEL_NAME}" <<'REMOTE'
 SERVE_PORT="$1"
 MODEL_NAME="$2"
 
@@ -152,7 +148,7 @@ if [ "${LINK_GATEWAY}" = "1" ]; then
   echo ""
   echo "==> [4/4] Linking Claude Gateway → llama-server (LOCAL_LLM_URL)..."
 
-  $SSH bash -s -- "${SERVE_PORT}" <<'REMOTE'
+  vm_ssh_heredoc -s -- "${SERVE_PORT}" <<'REMOTE'
 PORT="$1"
 ENV_FILE=~/.config/claude-gateway/.env
 if [ ! -f "${ENV_FILE}" ]; then
@@ -191,4 +187,4 @@ echo "  curl http://100.78.73.64:3456/v1/chat/completions \\"
 echo "    -H 'Content-Type: application/json' \\"
 echo "    -d '{\"model\":\"local\",\"messages\":[{\"role\":\"user\",\"content\":\"Hi!\"}]}'"
 echo ""
-echo "  Logs: ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'tail -f ~/llama-server.log'"
+echo "  Logs: ssh -p ${VM_PORT} ${VM_HOST} 'tail -f ~/llama-server.log'"

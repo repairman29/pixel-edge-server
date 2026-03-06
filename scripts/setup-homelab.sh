@@ -11,32 +11,26 @@
 
 set -euo pipefail
 
-PIXEL_HOST="${PIXEL_HOST:-droid@100.78.73.64}"
-PIXEL_PORT="${PIXEL_PORT:-8022}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 PULL_MODEL="${PULL_MODEL:-llama3.2:3b}"
 
-SSH="ssh -p ${PIXEL_PORT} ${PIXEL_HOST}"
-SCP="scp -P ${PIXEL_PORT}"
-
-echo "╔══════════════════════════════════════════════╗"
-echo "║     Pixel Homelab Stack — Docker Deploy      ║"
-echo "╚══════════════════════════════════════════════╝"
-echo "  Target : ${PIXEL_HOST}"
+vm_banner "Pixel Homelab Stack — Docker Deploy"
 echo "  Stack  : Ollama + Jellyfin + NGINX"
 echo ""
 
 # ── Step 1: copy homelab files ────────────────────────────────────────────────
 echo "==> [1/4] Copying homelab files to VM..."
 
-$SSH mkdir -p ~/homelab
-$SCP homelab/docker-compose.yml homelab/nginx.conf "${PIXEL_HOST}:~/homelab/"
+vm_ssh mkdir -p ~/homelab
+vm_scp homelab/docker-compose.yml homelab/nginx.conf "~/homelab/"
 
 echo "  Files copied."
 
 # ── Step 2: check Docker is available ─────────────────────────────────────────
 echo ""
 echo "==> [2/4] Checking Docker in VM..."
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 if ! command -v docker &>/dev/null; then
   echo "  Docker not found! Installing..."
   curl -fsSL https://get.docker.com | sh
@@ -56,7 +50,7 @@ REMOTE
 # ── Step 3: pull images & start stack ─────────────────────────────────────────
 echo ""
 echo "==> [3/4] Pulling images and starting stack..."
-$SSH bash <<'REMOTE'
+vm_ssh_heredoc <<'REMOTE'
 cd ~/homelab
 echo "  Pulling images (this may take a few minutes on first run)..."
 docker compose pull
@@ -71,15 +65,15 @@ if [ -n "${PULL_MODEL}" ]; then
   echo ""
   echo "==> [4/4] Pulling Ollama model: ${PULL_MODEL}..."
   echo "  (This downloads the model weights — may take a few minutes)"
-  $SSH "docker exec ollama ollama pull '${PULL_MODEL}'" || {
+  vm_ssh "docker exec ollama ollama pull '${PULL_MODEL}'" || {
     echo "  Model pull failed or still starting; retry with:"
-    echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} \"docker exec ollama ollama pull ${PULL_MODEL}\""
+    echo "  ssh -p ${VM_PORT} ${VM_HOST} \"docker exec ollama ollama pull ${PULL_MODEL}\""
   }
 else
   echo ""
   echo "==> [4/4] Skipping model pull (PULL_MODEL is empty)."
   echo "  Pull a model later with:"
-  echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'docker exec ollama ollama pull llama3.2:3b'"
+  echo "  ssh -p ${VM_PORT} ${VM_HOST} 'docker exec ollama ollama pull llama3.2:3b'"
 fi
 
 # ── done ──────────────────────────────────────────────────────────────────────
@@ -99,6 +93,6 @@ echo "  Add LOCAL_LLM_URL=http://127.0.0.1:11434/v1/chat/completions"
 echo "  to ~/.config/claude-gateway/.env on the VM, then restart claude-gateway."
 echo ""
 echo "  Manage the stack:"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'cd ~/homelab && docker compose ps'"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'cd ~/homelab && docker compose logs -f'"
-echo "  ssh -p ${PIXEL_PORT} ${PIXEL_HOST} 'cd ~/homelab && docker compose down'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'cd ~/homelab && docker compose ps'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'cd ~/homelab && docker compose logs -f'"
+echo "  ssh -p ${VM_PORT} ${VM_HOST} 'cd ~/homelab && docker compose down'"

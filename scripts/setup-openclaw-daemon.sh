@@ -5,13 +5,13 @@
 
 set -e
 
-SSH_OPTS="-p 8022 -o ConnectTimeout=15 -o StrictHostKeyChecking=no"
-TARGET="${1:-droid@100.78.73.64}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/vm-common.sh"
 
-echo "=== Setting up OpenClaw daemon on ${TARGET} ==="
+vm_banner "OpenClaw daemon setup"
 
 # Create wrapper and systemd user service in the VM
-ssh $SSH_OPTS "$TARGET" bash -s << 'REMOTE'
+vm_ssh_heredoc << 'REMOTE'
 set -e
 mkdir -p ~/bin ~/.config/systemd/user
 
@@ -55,6 +55,6 @@ REMOTE
 echo ""
 echo "OpenClaw gateway is installed as a user service and should be running."
 echo "Mission Control: http://100.78.73.64:18789"
-echo "To check: ssh -p 8022 $TARGET 'systemctl --user status openclaw-gateway'"
-echo "To stop:  ssh -p 8022 $TARGET 'systemctl --user stop openclaw-gateway'"
-echo "To start: ssh -p 8022 $TARGET 'systemctl --user start openclaw-gateway'"
+echo "To check: ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user status openclaw-gateway'"
+echo "To stop:  ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user stop openclaw-gateway'"
+echo "To start: ssh -p ${VM_PORT} ${VM_HOST} 'systemctl --user start openclaw-gateway'"
