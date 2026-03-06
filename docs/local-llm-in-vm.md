@@ -1,49 +1,104 @@
 # Local LLM in the VM (CPU-bound)
 
-Run a small LLM inside the Debian VM so OpenClaw can use it without the cloud. Pixel 8 Pro has no NPU in the VM; inference is CPU-bound (and optionally SVE-accelerated on ARM).
+Run a small LLM inside the Debian VM so Claude Gateway (and OpenClaw) can serve requests without the cloud API. Pixel 8 Pro has no NPU in the VM; inference is CPU-bound with optional ARM SVE acceleration.
 
-## Option A: Docker Model Runner
+## Quick start (automated)
 
-Docker can serve an OpenAI-compatible API from a container.
+Two one-command paths:
 
-1. **In the VM**, pull and run a small model (e.g. Phi or TinyLlama) per [Docker Model Runner](https://www.docker.com/blog/run-llms-lally/). Example (adjust image/tag for ARM64):
+| Goal | Command (from Mac) |
+|------|-------------------|
+| llama.cpp + SVE (bare metal, fastest) | `bash scripts/setup-llama-sve.sh` |
+| Ollama via Docker (easiest model management) | `bash scripts/setup-homelab.sh` |
 
-   ```bash
-   docker run -d --name llm -p 11434:11434 ...
-   ```
+After either script completes, set `LOCAL_LLM_URL` in the gateway config and restart:
 
-   Use an image that supports `linux/arm64`. If the official Model Runner image is x86-only, search for an ARM-compatible Ollama or llama.cpp server image.
+```bash
+# For llama-server (setup-llama-sve.sh)
+ssh -p 8022 droid@100.78.73.64 \
+  "echo 'LOCAL_LLM_URL=http://127.0.0.1:8080/v1/chat/completions' \
+   >> ~/.config/claude-gateway/.env && \
+   systemctl --user restart claude-gateway"
 
-2. **In OpenClaw**, set the model endpoint to `http://127.0.0.1:11434/v1` (or whatever port the container exposes).
+# For Ollama (setup-homelab.sh)
+ssh -p 8022 droid@100.78.73.64 \
+  "echo 'LOCAL_LLM_URL=http://127.0.0.1:11434/v1/chat/completions' \
+   >> ~/.config/claude-gateway/.env && \
+   systemctl --user restart claude-gateway"
+```
 
-3. **Performance:** Expect a few tokens per second for small models (e.g. 1–3B params) on the Tensor G3 CPU.
+Requests using model `"local"` or any `haiku/*` model name will now route to the on-device LLM at zero API cost.
 
-## Option B: llama.cpp with SVE (bare metal)
+See **[docs/llama-server.md](llama-server.md)** for llama-server detail and **[docs/homelab.md](homelab.md)** for the full homelab (Ollama + Jellyfin + NGINX) stack.
 
-For best CPU throughput on ARM, build llama.cpp in the VM with SVE enabled.
+---
 
-1. **In the VM:**
-   ```bash
-   sudo apt install -y build-essential cmake
-   git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp
-   cmake -B build -DGGML_SVE=ON
-   cmake --build build -j
-   ```
+## Option A: llama.cpp with SVE (automated, recommended)
 
-2. Download a small GGUF (e.g. 3B) and run the server:
-   ```bash
-   ./build/bin/llama-server -m model.gguf --port 8080
-   ```
+`setup-llama-sve.sh` builds llama.cpp in the VM with `DGGML_SVE=ON` for maximum ARM throughput, downloads Llama-3.2-3B-Instruct (Q4_K_M), installs a systemd user service (`llama-server`), and pins inference to the prime core with `taskset -c 0`.
 
-3. Point OpenClaw at `http://127.0.0.1:8080` (or use the OpenAI-compatible endpoint if the build supports it).
+**Expected performance:** ~12–16 tokens/second on a 3B model (Tensor G3, prime core, SVE).
 
-4. **Taskset:** Pin to the prime core for lower latency: `taskset -c 0 ./build/bin/llama-server ...`.
+```bash
+bash scripts/setup-llama-sve.sh   # run from Mac
+```
+
+The service runs at `http://127.0.0.1:8080` inside the VM with an OpenAI-compatible `/v1/chat/completions` endpoint.
+
+To swap the model after initial setup, SSH into the VM and replace the GGUF:
+
+```bash
+# In VM: download alternate model
+wget -P ~/llama-models/ https://huggingface.co/.../model.gguf
+# Update service ExecStart to point at new file, then restart
+systemctl --user restart llama-server
+```
+
+---
+
+## Option B: Ollama via Docker (easiest model management)
+
+`setup-homelab.sh` brings up the full homelab stack including Ollama with an OpenAI-compatible API at port 11434.
+
+```bash
+bash scripts/setup-homelab.sh   # run from Mac
+```
+
+**Pull models after stack is running (from VM):**
+
+```bash
+docker exec ollama ollama pull llama3.2:3b        # ~2 GB, fast
+docker exec ollama ollama pull phi3.5             # ~2.2 GB
+docker exec ollama ollama pull mistral:7b-instruct-q4_0  # ~4 GB, slower
+```
+
+**Performance:** Slightly lower throughput than bare-metal llama.cpp due to Docker overhead, but model management via `ollama pull/rm` is simpler.
+
+---
+
+## Manual build reference (advanced)
+
+If you need custom CMake flags or want to build from source without the script:
+
+```bash
+# In VM
+sudo apt install -y build-essential cmake
+git clone https://github.com/ggml-org/llama.cpp && cd llama.cpp
+cmake -B build -DGGML_SVE=ON
+cmake --build build -j$(nproc)
+
+# Run server (pin to prime core, OpenAI-compatible endpoint)
+taskset -c 0 ./build/bin/llama-server \
+  -m ~/llama-models/llama-3.2-3b-instruct-q4_k_m.gguf \
+  --port 8080 --host 127.0.0.1
+```
+
+---
 
 ## Summary
 
-| Method | Pros | Cons |
-|--------|------|------|
-| Docker Model Runner | Easy, OpenAI-compatible | Need ARM image; may be slower |
-| llama.cpp + SVE | Fast on ARM, full control | Build and config in VM |
-
-After one of these is running, configure OpenClaw to use the local endpoint as the default or an optional model.
+| Method | Throughput | Model management | Setup |
+|--------|-----------|-----------------|-------|
+| llama.cpp + SVE (`setup-llama-sve.sh`) | ~12–16 tok/s | Manual GGUF swap | One script |
+| Ollama (`setup-homelab.sh`) | ~8–12 tok/s | `ollama pull/rm` | One script |
+| Manual build | Same as above | Same as above | Manual |

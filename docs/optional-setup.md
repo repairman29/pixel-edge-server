@@ -87,13 +87,22 @@ The agent runs with the same privileges as the `droid` user in the VM; keep your
 
 ---
 
-## 7. Gateway health-check (self-heal)
+## 7. Gateway health-checks (self-heal)
 
-A script runs **every 5 minutes** (systemd user timer): if nothing is listening on port 18789, it restarts the OpenClaw gateway. So if the process dies without systemd noticing, the next run brings it back.
+Two layers of self-healing are available:
 
-**Install (from Mac):**
+**OpenClaw healthcheck** (port 18789 — legacy) — runs every 5 min via systemd timer; restarts OpenClaw if port 18789 goes dark.
+
 ```bash
-./scripts/setup-gateway-healthcheck.sh
+./scripts/setup-gateway-healthcheck.sh   # install from Mac
+# Log:
+ssh -p 8022 droid@100.78.73.64 'tail ~/openclaw-heartbeat/gateway-healthcheck.log'
 ```
 
-**Log:** `ssh -p 8022 droid@100.78.73.64 'tail ~/openclaw-heartbeat/gateway-healthcheck.log'`
+**Claude Gateway daemon** (port 3456) — the systemd service installed by `setup-claude-gateway-daemon.sh` already has `Restart=on-failure`, so the gateway recovers automatically without a separate timer. Verify with:
+
+```bash
+ssh -p 8022 droid@100.78.73.64 'systemctl --user status claude-gateway'
+```
+
+**Claude Gateway AI heartbeat** — Claude itself runs every 30 min, checks thermals, disk, and services, and writes a report. Install with `./scripts/setup-claude-heartbeat.sh`. See **[docs/claude-gateway.md](claude-gateway.md)** → AI Heartbeat section.
