@@ -18,7 +18,8 @@ import java.util.concurrent.TimeUnit
  */
 class GatewayClient(
     private val baseUrl: String = "http://127.0.0.1:18789",
-    private val toolExecutor: ToolExecutor
+    private val toolExecutor: ToolExecutor,
+    private val apiKey: String? = null
 ) {
     companion object {
         private const val TAG = "GatewayClient"
@@ -134,7 +135,7 @@ class GatewayClient(
         tools: List<Map<String, Any>>?
     ): JSONObject {
         val jsonBody = JSONObject().apply {
-            put("model", "gpt-4")  // Gateway handles model selection
+            put("model", "auto")  // Gateway handles model selection
             put("messages", JSONArray(messages.map { msg ->
                 JSONObject().apply {
                     put("role", msg["role"])
@@ -152,11 +153,17 @@ class GatewayClient(
 
         val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
         
-        val request = Request.Builder()
+        val requestBuilder = Request.Builder()
             .url("$baseUrl/v1/chat/completions")
             .post(requestBody)
             .header("Content-Type", "application/json")
-            .build()
+        
+        // Add API key if provided
+        if (!apiKey.isNullOrEmpty()) {
+            requestBuilder.header("Authorization", "Bearer $apiKey")
+        }
+        
+        val request = requestBuilder.build()
 
         return try {
             client.newCall(request).execute().use { response ->
@@ -193,39 +200,12 @@ class GatewayClient(
     }
 
     /**
-     * Get available tools from gateway
+     * Get available tools.
+     * Clawdbot gateway does not expose a /v1/tools endpoint — it handles tool
+     * dispatch internally. We expose the set of tools the Android side can
+     * execute so the gateway can surface them in the tool-call loop.
      */
-    suspend fun getTools(): List<Map<String, Any>> = withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder()
-                .url("$baseUrl/v1/tools")
-                .get()
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: "[]"
-                    val jsonArray = JSONArray(body)
-                    (0 until jsonArray.length()).map { i ->
-                        val tool = jsonArray.getJSONObject(i)
-                        mapOf(
-                            "type" to "function",
-                            "function" to mapOf(
-                                "name" to tool.getString("name"),
-                                "description" to tool.optString("description", ""),
-                                "parameters" to tool.getJSONObject("parameters").toString()
-                            )
-                        )
-                    }
-                } else {
-                    emptyList()
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to get tools: ${e.message}")
-            getDefaultTools()
-        }
-    }
+    fun getTools(): List<Map<String, Any>> = getDefaultTools()
 
     /**
      * Default tools when gateway doesn't provide them

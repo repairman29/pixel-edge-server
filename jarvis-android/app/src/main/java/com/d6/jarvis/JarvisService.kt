@@ -3,6 +3,7 @@ package com.d6.jarvis
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -33,6 +34,7 @@ class JarvisService : Service() {
         private const val NOTIF_ID = 1001
         private const val HTTP_PORT = 9090
         private const val GATEWAY_URL = "http://127.0.0.1:18789"
+        private const val GATEWAY_API_KEY = "sk_dcd6c7f2dde7cab80421df8afab14901b3b8b16cb4b61abd"
 
         const val EXTRA_TOKEN = "telegram_token"
         const val EXTRA_MODEL_PATH = "model_path"
@@ -94,7 +96,7 @@ class JarvisService : Service() {
         
         // Initialize components
         toolExecutor = ToolExecutor(applicationContext)
-        gatewayClient = GatewayClient(GATEWAY_URL, toolExecutor)
+        gatewayClient = GatewayClient(GATEWAY_URL, toolExecutor, GATEWAY_API_KEY)
         llmEngine = LlmEngine(applicationContext)
         termuxBridge = TermuxBridge(applicationContext)
         termuxIntegration = TermuxIntegration(applicationContext)
@@ -106,11 +108,11 @@ class JarvisService : Service() {
         when (intent?.action) {
             ACTION_START -> {
                 val token = intent.getStringExtra(EXTRA_TOKEN)?.takeIf { it.isNotEmpty() } 
-                    ?: "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"
+                    ?: "8757734547:AAE-MCgafrmkEAIoXINA2zsAPb3mjBHFdvM"
                 val modelPath = intent.getStringExtra(EXTRA_MODEL_PATH)
                     ?: LlmEngine.DEFAULT_MODEL_PATH
 
-                startForeground(NOTIF_ID, buildNotification("Starting…"))
+                startForeground(NOTIF_ID, buildNotification("Starting…"), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
                 acquireWakeLock()
                 serviceScope.launch { boot(token, modelPath) }
             }
@@ -146,13 +148,9 @@ class JarvisService : Service() {
             broadcast("✓ Gateway connected (OpenClaw)")
             useGateway = true
             
-            // Get available tools
-            try {
-                availableTools = gatewayClient.getTools()
-                broadcast("✓ Loaded ${availableTools.size} tools")
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to get tools", e)
-            }
+            // Get available tools (Android-side tools exposed to the gateway)
+            availableTools = gatewayClient.getTools()
+            broadcast("✓ Loaded ${availableTools.size} tools")
         } else {
             broadcast("⚠️ Gateway unavailable - JARVIS needs OpenClaw gateway running on port 18789")
             updateNotification("⚠️ Waiting for OpenClaw gateway…")
@@ -182,8 +180,8 @@ class JarvisService : Service() {
             broadcast("HTTP server error: ${e.message}")
         }
 
-        // 4. Start Telegram bot
-        if (telegramToken.isNotBlank()) {
+        // 4. Start Telegram bot (skip if gateway is handling Telegram)
+        if (telegramToken.isNotBlank() && !useGateway) {
             try {
                 val bot = TelegramBot(
                     token = telegramToken,
@@ -205,6 +203,9 @@ class JarvisService : Service() {
                 broadcast("Telegram error: ${e.message}")
                 updateNotification("⚠️ Running (Telegram error)")
             }
+        } else if (useGateway) {
+            broadcast("Gateway connected — Telegram handled by OpenClaw")
+            updateNotification("🟢 Running — Gateway (Telegram via OpenClaw)")
         } else {
             broadcast("No Telegram token — HTTP only")
             updateNotification("🟢 Running — HTTP only")
