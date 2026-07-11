@@ -3,6 +3,12 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localPropsFile.withInputStream { localProps.load(it) }
+}
+
 android {
     namespace 'com.d6.jarvis'
     compileSdk 35
@@ -13,6 +19,10 @@ android {
         targetSdk 35
         versionCode 1
         versionName "1.0"
+
+        // Secrets come from local.properties (gitignored) — never commit real values
+        buildConfigField "String", "TELEGRAM_BOT_TOKEN", "\"${localProps.getProperty('jarvis.telegramToken', '')}\""
+        buildConfigField "String", "GATEWAY_API_KEY", "\"${localProps.getProperty('jarvis.gatewayApiKey', '')}\""
     }
 
     buildTypes {
@@ -32,6 +42,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 
     packaging {

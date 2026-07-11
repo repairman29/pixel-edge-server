@@ -34,7 +34,7 @@ class JarvisService : Service() {
         private const val NOTIF_ID = 1001
         private const val HTTP_PORT = 9090
         private const val GATEWAY_URL = "http://127.0.0.1:18789"
-        private const val GATEWAY_API_KEY = "sk_dcd6c7f2dde7cab80421df8afab14901b3b8b16cb4b61abd"
+        private val GATEWAY_API_KEY = BuildConfig.GATEWAY_API_KEY
 
         const val EXTRA_TOKEN = "telegram_token"
         const val EXTRA_MODEL_PATH = "model_path"
@@ -107,8 +107,8 @@ class JarvisService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val token = intent.getStringExtra(EXTRA_TOKEN)?.takeIf { it.isNotEmpty() } 
-                    ?: "8757734547:AAE-MCgafrmkEAIoXINA2zsAPb3mjBHFdvM"
+                val token = intent.getStringExtra(EXTRA_TOKEN)?.takeIf { it.isNotEmpty() }
+                    ?: BuildConfig.TELEGRAM_BOT_TOKEN
                 val modelPath = intent.getStringExtra(EXTRA_MODEL_PATH)
                     ?: LlmEngine.DEFAULT_MODEL_PATH
 
@@ -157,7 +157,7 @@ class JarvisService : Service() {
             useGateway = false
         }
 
-        // 2. Load local LLM as fallback (disabled to prevent crashes)
+        // 2. Load local LLM as fallback (disabled to prevent crashes; use "!use local" in Telegram to load on demand)
         // if (!useGateway) {
         //     broadcast("Loading local LLM (fallback)…")
         //     try {
@@ -170,9 +170,21 @@ class JarvisService : Service() {
         //     }
         // }
 
-        // 3. Start HTTP server
+        // 3. Start HTTP server (with /load-model so you can trigger model load without Telegram)
         try {
-            httpServer = HttpApiServer(HTTP_PORT, llmEngine).also { it.start() }
+            httpServer = HttpApiServer(HTTP_PORT, llmEngine) {
+                serviceScope.launch {
+                    broadcast("Loading local LLM (via /load-model)…")
+                    try {
+                        llmEngine.initialize(LlmEngine.DEFAULT_MODEL_PATH, LlmEngine.Companion.BackendPreference.AUTO)
+                        broadcast("${llmEngine.getStatus()} ✓")
+                    } catch (e: Exception) {
+                        val msg = "Model load failed: ${e.message}"
+                        broadcast(msg)
+                        Log.e(TAG, msg, e)
+                    }
+                }
+            }.also { it.start() }
             broadcast("HTTP API on :$HTTP_PORT ✓")
             Log.d(TAG, "HTTP server started on port $HTTP_PORT")
         } catch (e: Exception) {
