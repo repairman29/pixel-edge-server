@@ -32,3 +32,16 @@ jarvis-android/app/build/
 jarvis-android/build/
 jarvis-android.tar.gz
 *.apk
+
+# Android build outputs + local config (contain compiled-in secrets)
+jarvis-android/.gradle/
+jarvis-android/app/build/
+jarvis-android/build/
+local.properties
+
+# Runtime configs with live credentials — keep out of git
+pixel-edge-server/clawdbot-config*.json
+pixel-edge-server/clawdbot-master-config.json
+pixel-edge-server/clawdbot-minimal.json
+pixel-edge-server/CHROOT_MASTER_CONFIG.json
+pixel-edge-server/create-granite-config.sh

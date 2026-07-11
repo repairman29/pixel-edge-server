@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         statusDot = findViewById(R.id.statusDot)
 
         // Restore saved values (or use defaults)
-        val defaultToken = "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"
+        val defaultToken = BuildConfig.TELEGRAM_BOT_TOKEN
         tokenInput.setText(prefs.getString(PREF_TOKEN, defaultToken))
         modelPathInput.setText(
             prefs.getString(PREF_MODEL_PATH, LlmEngine.DEFAULT_MODEL_PATH)
