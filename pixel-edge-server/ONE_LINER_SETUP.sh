@@ -87,7 +87,7 @@ cat > ~/.config/openclaw/config.json << 'CONFIG_EOF'
   },
   "telegram": {
     "enabled": true,
-    "botToken": "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"
+    "botToken": "REPLACE_WITH_YOUR_TELEGRAM_BOT_TOKEN"
   }
 }
 CONFIG_EOF

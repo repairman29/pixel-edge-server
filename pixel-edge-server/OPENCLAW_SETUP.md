@@ -60,7 +60,7 @@ cat > ~/.config/openclaw/config.json << 'EOF'
     "model": "gemma-3b"
   },
   "telegram": {
-    "botToken": "8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c"
+    "botToken": "<YOUR_TELEGRAM_BOT_TOKEN>"
   }
 }
 EOF

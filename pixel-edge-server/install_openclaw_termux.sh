@@ -133,7 +133,7 @@ mkdir -p ~/.config/openclaw
 JARVIS_API="http://127.0.0.1:9090/v1"
 
 # Get Telegram token from user or use default
-TELEGRAM_TOKEN="${1:-8782380079:AAG6RUJT5FXKUs8JG8Nv4cCpvWCpHZPMm0c}"
+TELEGRAM_TOKEN="${1:-${TELEGRAM_BOT_TOKEN:?Provide the Telegram bot token as arg 1 or via the TELEGRAM_BOT_TOKEN env var}}"
 
 cat > ~/.config/openclaw/config.json << EOF
 {
