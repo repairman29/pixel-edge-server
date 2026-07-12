@@ -1,0 +1,8 @@
+
+# never commit private keys or build artifacts
+*_key
+*.pem
+id_ed25519*
+**/assets/**/*key*
+app/build/
+**/build/intermediates/
