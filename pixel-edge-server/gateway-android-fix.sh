@@ -37,7 +37,7 @@ cat > "$HOME/.clawdbot/clawdbot.json" << 'EOF'
 {
   "gateway": {
     "mode": "local",
-    "port": 18789,
+    "port": 18790,
     "bind": "lan"
   }
 }
@@ -46,7 +46,7 @@ echo "  ✓ Config created"
 echo ""
 
 # Step 4: Start gateway
-echo "Step 4: Starting gateway on port 18789..."
+echo "Step 4: Starting gateway on port 18790..."
 echo ""
 echo "Running: ./node_modules/.bin/clawdbot gateway run"
 echo ""

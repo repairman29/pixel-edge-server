@@ -8,7 +8,7 @@ echo "=========================================="
 echo ""
 
 # Configuration
-GATEWAY_PORT=18789
+GATEWAY_PORT=18790
 JARVIS_DIR="$HOME/JARVIS"
 CONFIG_DIR="$HOME/.clawdbot"
 
@@ -37,7 +37,7 @@ cat > "$CONFIG_DIR/clawdbot.json" << 'EOF'
 {
   "gateway": {
     "mode": "local",
-    "port": 18789,
+    "port": 18790,
     "bind": "lan"
   }
 }

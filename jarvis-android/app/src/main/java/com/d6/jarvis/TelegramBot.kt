@@ -31,6 +31,10 @@ class TelegramBot(
     }
 
     private val baseUrl = "https://api.telegram.org/bot$token"
+    
+    init {
+        Log.d(TAG, "Bot initialized with baseUrl: $baseUrl")
+    }
 
     // Separate client with long read timeout for polling
     private val pollClient = OkHttpClient.Builder()
@@ -156,14 +160,20 @@ class TelegramBot(
             put("parse_mode", "Markdown")
         }.toString().toRequestBody("application/json".toMediaType())
 
+        val requestUrl = "$baseUrl/sendMessage"
+        Log.d(TAG, "Sending message to: $requestUrl")
+        
         val request = Request.Builder()
-            .url("$baseUrl/sendMessage")
+            .url(requestUrl)
             .post(body)
             .build()
 
         try {
             sendClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "No error body"
+                    Log.e(TAG, "sendMessage failed: HTTP ${response.code} - $errorBody")
+                    
                     // Retry without markdown if parse error
                     val plainBody = JSONObject().apply {
                         put("chat_id", chatId)

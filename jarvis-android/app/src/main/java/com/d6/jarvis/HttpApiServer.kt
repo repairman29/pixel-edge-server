@@ -10,15 +10,17 @@ import org.json.JSONObject
 import java.io.IOException
 
 /**
- * HTTP server that exposes the LLM via two endpoints:
+ * HTTP server that exposes the LLM via:
  *
  *   POST /infer                     { "prompt": "..." }  → { "text": "..." }
  *   POST /v1/chat/completions       OpenAI-compatible     → OpenAI response shape
  *   GET  /health                    → { "ok": true, "ready": true/false }
+ *   POST /load-model                Trigger model load (no Telegram). Returns 202 while loading.
  */
 class HttpApiServer(
     private val port: Int = 9192,
-    private val llmEngine: LlmEngine
+    private val llmEngine: LlmEngine,
+    private val onLoadModel: (() -> Unit)? = null
 ) : NanoHTTPD("0.0.0.0", port) {
 
     companion object {
@@ -27,15 +29,17 @@ class HttpApiServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
-        val uri = session.uri
+        val rawUri = session.uri
+        val path = rawUri.substringBefore('?').trimEnd('/').ifEmpty { "/" }
         val method = session.method
 
-        Log.d(TAG, "$method $uri")
+        Log.d(TAG, "$method $path (raw: $rawUri)")
 
         return when {
-            method == Method.GET && uri == "/health" -> handleHealth()
-            method == Method.POST && uri == "/infer" -> handleInfer(session)
-            method == Method.POST && uri == "/v1/chat/completions" -> handleChatCompletions(session)
+            method == Method.GET && path == "/health" -> handleHealth()
+            (method == Method.POST || method == Method.GET) && path == "/load-model" -> handleLoadModel()
+            method == Method.POST && path == "/infer" -> handleInfer(session)
+            method == Method.POST && path == "/v1/chat/completions" -> handleChatCompletions(session)
             else -> newFixedLengthResponse(
                 Response.Status.NOT_FOUND, JSON_TYPE,
                 """{"error":"not found"}"""
@@ -54,6 +58,38 @@ class HttpApiServer(
             put("error", llmEngine.loadError)
         }
         return jsonResponse(body)
+    }
+
+    // ------------------------------------------------------------------
+    // POST or GET /load-model  (trigger load without Telegram)
+    // ------------------------------------------------------------------
+
+    private fun handleLoadModel(): Response {
+        if (llmEngine.isReady) {
+            return newFixedLengthResponse(
+                Response.Status.OK, JSON_TYPE,
+                JSONObject().apply {
+                    put("ok", true)
+                    put("ready", true)
+                    put("message", "Model already loaded")
+                }.toString()
+            )
+        }
+        if (onLoadModel == null) {
+            return newFixedLengthResponse(
+                Response.Status.NOT_IMPLEMENTED, JSON_TYPE,
+                JSONObject().put("error", "Load not available").toString()
+            )
+        }
+        onLoadModel.invoke()
+        return newFixedLengthResponse(
+            Response.Status.ACCEPTED, JSON_TYPE,
+            JSONObject().apply {
+                put("ok", true)
+                put("ready", false)
+                put("message", "Model load started. Wait 1–2 min then check GET /health or use /v1/chat/completions")
+            }.toString()
+        )
     }
 
     // ------------------------------------------------------------------

@@ -45,3 +45,6 @@ pixel-edge-server/clawdbot-master-config.json
 pixel-edge-server/clawdbot-minimal.json
 pixel-edge-server/CHROOT_MASTER_CONFIG.json
 pixel-edge-server/create-granite-config.sh
+
+# fleet coordination state (local, never commit)
+.chump-locks/
