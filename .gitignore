@@ -48,3 +48,10 @@ pixel-edge-server/create-granite-config.sh
 
 # fleet coordination state (local, never commit)
 .chump-locks/
+
+# unreviewable / non-source artifacts (kept local)
+pixel-edge-server/screen.png
+session-ses_*.md
+# credential-bearing setup scripts (local shadow hash / enables ssh password auth) — review before committing
+pixel-edge-server/enable-pass.sh
+pixel-edge-server/set-passwd.sh

@@ -1,0 +1,16 @@
+# Routing: reflexive (on-device) vs neocortex (cloud)
+# Phase 2: start with a single reflexive URL (e.g. Jarvis 9090 or Ollama)
+
+reflexive:
+  url: "http://127.0.0.1:9090"   # Jarvis or Ollama fallback
+  # model: optional override
+
+neocortex:
+  # Uncomment when adding cloud LLMs (Phase 2)
+  # claude:
+  #   model: "claude-3-5-sonnet-20241022"
+  # gemini:
+  #   model: "gemini-1.5-pro"
+
+# Classifier: which model to use (simple rule for now: default reflexive)
+default: reflexive

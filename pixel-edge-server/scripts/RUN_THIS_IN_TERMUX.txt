@@ -1,0 +1,21 @@
+Hugging Face token: stored in scripts/.hf-token (gitignored). To push it to the Pixel so the gateway can use HF when Jarvis is down: from Mac run ./scripts/push-hf-token.sh. Then in Termux: cp /sdcard/jarvis/.env.pixel-agent ~/.env.pixel-agent and run with: source ~/.env.pixel-agent && ./pixel-agent-v2 (or copy scripts/run-gateway.sh to ~/run-gateway.sh and chmod +x, then ~/run-gateway.sh).
+
+If you get "permission denied", do this in order in Termux:
+
+1. Grant storage (run once, tap Allow when prompted):
+   termux-setup-storage
+
+2. Copy the script to your home and run it from there:
+   cp /sdcard/jarvis/build-in-termux.sh ~/build-in-termux.sh
+   chmod +x ~/build-in-termux.sh
+   ~/build-in-termux.sh
+
+If step 1 or 2 still says "permission denied", run the build by hand (paste each line):
+
+   termux-setup-storage
+   cd ~ && rm -rf pixel-agent-v2-src && mkdir -p pixel-agent-v2-src && cd pixel-agent-v2-src
+   tar -xzf /sdcard/jarvis/pixel-agent-v2-src.tar.gz --strip-components=1
+   pkg install -y rust
+   cargo build --release
+   cp target/release/pixel-agent-v2 ~/pixel-agent-v2 && chmod +x ~/pixel-agent-v2
+   echo Done. Run: ./pixel-agent-v2

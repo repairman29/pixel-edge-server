@@ -1,0 +1,3 @@
+# Minimal deps for Termux (no native build). Python 3.10+.
+python-telegram-bot>=21.0
+requests>=2.28.0
