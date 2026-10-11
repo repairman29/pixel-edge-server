@@ -8,18 +8,18 @@ Best-in-class Pixel agent: gateway + router + reflexive (Jarvis on device). **Ru
 
 The Pixel runs **Linux (aarch64)**; a Mac build won’t run there. Use one of:
 
-**A. Script (recommended)** — from `pixel-edge-server`:
+**A. Script (recommended)**, from `pixel-edge-server`:
 ```bash
 ./scripts/build-and-push-pixel.sh
 ```
 Requires `cross` (`cargo install cross`) or a working `aarch64-unknown-linux-gnu` target + linker.
 
-**B. Manual cross-compile** — in `pixel-agent-v2`:
+**B. Manual cross-compile**, in `pixel-agent-v2`:
 ```bash
 cross build --release --target aarch64-unknown-linux-gnu
 adb push target/aarch64-unknown-linux-gnu/release/pixel-agent-v2 /sdcard/jarvis/pixel-agent-v2
 ```
-**C. Build in Termux** — push the project to the device, then in Termux: `pkg install rust -y`, `cd ~/pixel-agent-v2`, `cargo build --release`. Binary: `target/release/pixel-agent-v2`.
+**C. Build in Termux**, push the project to the device, then in Termux: `pkg install rust -y`, `cd ~/pixel-agent-v2`, `cargo build --release`. Binary: `target/release/pixel-agent-v2`.
 
 ## Deploy and run on the Pixel
 
@@ -29,7 +29,7 @@ adb push target/aarch64-unknown-linux-gnu/release/pixel-agent-v2 /sdcard/jarvis/
    cp /sdcard/jarvis/pixel-agent-v2 ~/pixel-agent-v2
    chmod +x ~/pixel-agent-v2
    ```
-3. **Start Jarvis** on the Pixel (open the app so the HTTP API is listening on 9090). If the model doesn’t load at boot, you can try `curl -X POST http://127.0.0.1:9090/load-model` from Termux (same device) — note this can crash the app on some devices.
+3. **Start Jarvis** on the Pixel (open the app so the HTTP API is listening on 9090). If the model doesn’t load at boot, you can try `curl -X POST http://127.0.0.1:9090/load-model` from Termux (same device), note this can crash the app on some devices.
 4. **Run the gateway** in Termux:
    ```bash
    ./pixel-agent-v2
@@ -41,9 +41,9 @@ All runtime is on the Pixel: no Mac in the loop.
 
 ## Config (on device)
 
-- **REFLEXIVE_URL** — default `http://127.0.0.1:9090` (Jarvis on same Pixel). Leave unset unless you point at another host.
-- **REFLEXIVE_MODEL** — default `gemma-3b`; override if your backend expects a different model name.
-- **PORT** — gateway listen port (default 18789).
+- **REFLEXIVE_URL**, default `http://127.0.0.1:9090` (Jarvis on same Pixel). Leave unset unless you point at another host.
+- **REFLEXIVE_MODEL**, default `gemma-3b`; override if your backend expects a different model name.
+- **PORT**, gateway listen port (default 18789).
 
 ## 503 / Jarvis crashes
 
@@ -56,4 +56,4 @@ To hit the gateway from your Mac while it runs on the Pixel: `adb forward tcp:18
 ## Phases
 
 - **Phase 2:** `/chat` → reflexive (Jarvis 9090 on Pixel). Pass test checkpoint.
-- **Phase 3–5:** Heartbeat, outbox, memory, app, voice — see [BLUEPRINT_BEST_IN_CLASS.md](../BLUEPRINT_BEST_IN_CLASS.md).
+- **Phase 3–5:** Heartbeat, outbox, memory, app, voice, see [BLUEPRINT_BEST_IN_CLASS.md](../BLUEPRINT_BEST_IN_CLASS.md).

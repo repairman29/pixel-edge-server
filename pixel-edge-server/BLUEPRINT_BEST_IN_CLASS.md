@@ -46,9 +46,9 @@ flowchart TB
   MissionControl <--> Tailscale
 ```
 
-- **Native app (Android Studio)**: **Chat UI** for on-device comms — text and **voice** (“talk” to the agent); notifications for proactive messages; optional in-app AICore/Gemini Nano. Connects to the agent over localhost (Termux-bridged port or in-app gateway). Voice: mic → speech-to-text → agent → response → optional text-to-speech so you can have a conversation hands-free when we get the stack that advanced.
+- **Native app (Android Studio)**: **Chat UI** for on-device comms, text and **voice** (“talk” to the agent); notifications for proactive messages; optional in-app AICore/Gemini Nano. Connects to the agent over localhost (Termux-bridged port or in-app gateway). Voice: mic → speech-to-text → agent → response → optional text-to-speech so you can have a conversation hands-free when we get the stack that advanced.
 - **Termux / Rust agent**: Single binary (or a small set of bins) for orchestrator, gateway, heartbeat, memory, outbox. **Termux:API** (via subprocess or a small bridge) for SMS, GPS, clipboard, TTS when needed.
-- **Routing orchestrator**: Bicameral Mind — classifies task, sends to Reflexive (on-device) or Neocortex (cloud).
+- **Routing orchestrator**: Bicameral Mind, classifies task, sends to Reflexive (on-device) or Neocortex (cloud).
 - **Reflexive**: High-frequency, low-complexity. **On-device Gemini Nano** via AICore (native app or Project Heimdall in Termux when viable) or fallback local endpoint.
 - **Neocortex**: Complex reasoning. **Cloud**: Claude 3.5 Sonnet, Gemini 1.5/2.5 Pro.
 - **Heartbeat**: Think–Decide–Act–Observe on a schedule; isolated session to avoid memory leaks.
@@ -110,7 +110,7 @@ Use **Android Studio** and **Kotlin** when a native app is better or faster to m
 2. **App hosts gateway + UI**: Agent core (Rust binary) still in Termux. A **foreground service** in the app runs a small HTTP/WebSocket gateway that the chat UI and Mission Control call; the gateway forwards to the agent. Keeps one place for “how to talk to the agent” and lets the app own notifications and lifecycle.
 3. **Heavy lifting in-app**: For maximum integration, move orchestrator + reflexive into the app (Kotlin); Termux only for cron/heartbeat and tools (shell, Termux:API). Bigger refactor; do only if we want AICore in-app and a single process.
 
-**Recommendation**: Start with **(1) App as client only** — minimal Android surface (chat UI + optional notification receiver), Rust agent and gateway in Termux. Add **(2)** if we want one stable endpoint for both the app and Mission Control.
+**Recommendation**: Start with **(1) App as client only**, minimal Android surface (chat UI + optional notification receiver), Rust agent and gateway in Termux. Add **(2)** if we want one stable endpoint for both the app and Mission Control.
 
 ### Tech stack for the app
 
@@ -230,7 +230,7 @@ pixel-edge-server/
   blueprint/
     BLUEPRINT_BEST_IN_CLASS.md
   pixel-agent/                  # Existing minimal agent (stopgap / fallback)
-  pixel-agent-v2/               # New: best-in-class stack — Rust agent
+  pixel-agent-v2/               # New: best-in-class stack, Rust agent
     README.md
     Cargo.toml
     config/
@@ -252,7 +252,7 @@ pixel-edge-server/
     scripts/
       setup_termux.sh
       phantom_bypass.sh
-  pixel-agent-app/              # Native Android (Android Studio) — chat UI, voice (STT/TTS), optional gateway
+  pixel-agent-app/              # Native Android (Android Studio), chat UI, voice (STT/TTS), optional gateway
     README.md
     app/
       src/main/
@@ -285,8 +285,8 @@ Implement in order: **1 → 2 → 3 → 4 → 5**. Do not start the next phase u
 
 - **Phantom process killer**: Android 14, 32-process limit; ADB `device_config` and `settings` (see section 2.1).
 - **Termux**: F-Droid or [termux/termux-app](https://github.com/termux/termux-app); Termux:API for hardware.
-- **Project Heimdall (FreeGeminiNano)**: [MartialTerran/Project_FreeGeminiNano-...](https://github.com/MartialTerran/Project_FreeGeminiNano-A_Python_Bridge_for_Chrome-s_On-Device_Gemini_Nano) — Python bridge to Chrome’s Gemini Nano; experimental.
-- **Mission Control**: [builderz-labs/mission-control](https://github.com/builderz-labs/mission-control) — Next.js 16, React 19, SQLite, 28 panels, Kanban, Quality Gates.
+- **Project Heimdall (FreeGeminiNano)**: [MartialTerran/Project_FreeGeminiNano-...](https://github.com/MartialTerran/Project_FreeGeminiNano-A_Python_Bridge_for_Chrome-s_On-Device_Gemini_Nano), Python bridge to Chrome’s Gemini Nano; experimental.
+- **Mission Control**: [builderz-labs/mission-control](https://github.com/builderz-labs/mission-control), Next.js 16, React 19, SQLite, 28 panels, Kanban, Quality Gates.
 - **MonClaw / heartbeat**: Isolated session per run to avoid memory leaks; outbox for proactive messages ([cefboud.com/posts/monclaw-...](https://cefboud.com/posts/monclaw-a-light-openclaw-with-opencode-sdk/)).
 - **Hybrid routing**: Reflexive (edge) vs Neocortex (cloud); Claude 3.5 Sonnet (daily), Gemini 1.5/2.5 Pro (long context).
 - **Memory**: Last 5 turns verbatim; hierarchical summarization; operational data as pointers (r/AgentsOfAI “I built my agent from scratch”).

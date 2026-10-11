@@ -6,7 +6,7 @@
 
 Open Termux and run:
 ```bash
-curl -o ~/setup_ssh.sh https://raw.githubusercontent.com/repairman29/jarvis-android/main/scripts/setup_ssh.sh
+curl -o ~/setup_ssh.sh https://raw.githubusercontent.com/repairman29/pixel-edge-server/main/jarvis-android/scripts/setup_ssh.sh
 bash ~/setup_ssh.sh
 ```
 
@@ -26,7 +26,7 @@ passwd
 
 **Option A: Using Tailscale IP (recommended)**
 ```bash
-ssh -p 8022 termux@100.78.73.64
+ssh -p 8022 termux@<PIXEL_TAILSCALE_IP>
 ```
 
 **Option B: Using ADB port forward**
@@ -62,7 +62,7 @@ chmod 600 ~/.ssh/authorized_keys
 # Create SSH config
 cat >> ~/.ssh/config << 'EOF'
 Host termux-pixel
-    HostName 100.78.73.64
+    HostName <PIXEL_TAILSCALE_IP>
     Port 8022
     User termux
     IdentityFile ~/.ssh/termux_pixel
@@ -128,16 +128,16 @@ You can also execute commands directly without the bridge:
 
 ```bash
 # Check storage
-ssh -p 8022 termux@100.78.73.64 'df -h'
+ssh -p 8022 termux@<PIXEL_TAILSCALE_IP> 'df -h'
 
 # List files
-ssh -p 8022 termux@100.78.73.64 'ls -la /sdcard'
+ssh -p 8022 termux@<PIXEL_TAILSCALE_IP> 'ls -la /sdcard'
 
 # Run Python
-ssh -p 8022 termux@100.78.73.64 'python3 -c "print(2+2)"'
+ssh -p 8022 termux@<PIXEL_TAILSCALE_IP> 'python3 -c "print(2+2)"'
 
 # Install packages
-ssh -p 8022 termux@100.78.73.64 'pkg install nodejs -y'
+ssh -p 8022 termux@<PIXEL_TAILSCALE_IP> 'pkg install nodejs -y'
 ```
 
 ## Troubleshooting
@@ -173,7 +173,7 @@ ifconfig wlan0
 Forward Jarvis HTTP port through SSH:
 ```bash
 # On Mac, forward port 9090 from Pixel to localhost:9090
-ssh -p 8022 -L 9090:localhost:9090 termux@100.78.73.64
+ssh -p 8022 -L 9090:localhost:9090 termux@<PIXEL_TAILSCALE_IP>
 
 # Now access on Mac:
 curl http://localhost:9090/status

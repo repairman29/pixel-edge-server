@@ -12,7 +12,7 @@ On your Pixel 8 Pro:
 ### Step 2: Run Setup Script (1 minute)
 In Termux, paste this:
 ```bash
-echo 'allow-external-apps = true' >> ~/.termux/termux.properties && termux-reload-settings && pkg update && pkg install python -y && curl -o ~/jarvis_bridge.py https://raw.githubusercontent.com/repairman29/jarvis-android/main/scripts/termux_bridge.py && python3 ~/jarvis_bridge.py
+echo 'allow-external-apps = true' >> ~/.termux/termux.properties && termux-reload-settings && pkg update && pkg install python -y && curl -o ~/jarvis_bridge.py https://raw.githubusercontent.com/repairman29/pixel-edge-server/main/jarvis-android/scripts/termux_bridge.py && python3 ~/jarvis_bridge.py
 ```
 
 **That's it!** The bridge is now running.
@@ -68,7 +68,7 @@ pkg install python -y
 cp /sdcard/jarvis/scripts/termux_bridge.py ~/jarvis_bridge.py
 
 # Option B: Download from GitHub
-curl -o ~/jarvis_bridge.py https://raw.githubusercontent.com/repairman29/jarvis-android/main/scripts/termux_bridge.py
+curl -o ~/jarvis_bridge.py https://raw.githubusercontent.com/repairman29/pixel-edge-server/main/jarvis-android/scripts/termux_bridge.py
 ```
 
 ### 5. Start Bridge

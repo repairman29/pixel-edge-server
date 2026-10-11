@@ -5,7 +5,7 @@ echo "=== Testing Telegram API ==="
 echo ""
 
 TOKEN="${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN before running this script}"
-CHAT_ID="8705004824"
+CHAT_ID="<YOUR_TELEGRAM_CHAT_ID>"
 
 echo "Testing getMe..."
 curl -s "https://api.telegram.org/bot${TOKEN}/getMe"

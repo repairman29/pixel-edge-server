@@ -239,7 +239,7 @@ ssh -p 8022 termux@127.0.0.1 'tail -20 /sdcard/jarvis/bridge.log'
 
 ## License
 
-MIT License - See LICENSE file
+GNU AGPLv3 - See LICENSE file
 
 ## Credits
 

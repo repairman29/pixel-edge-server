@@ -7,7 +7,7 @@ A pocket-sized edge-AI stack: an Android app (`jarvis-android`) + Termux/Debian 
 
 ## License
 
-**GNU AGPLv3** — free to run, study, and modify. Run a modified version as a network service and you
+**GNU AGPLv3**, free to run, study, and modify. Run a modified version as a network service and you
 must share your changes. Own your tools; keep them ownable.
 
 Copyright (C) 2026 Jeff Adkins (repairman29). See [LICENSE](LICENSE).

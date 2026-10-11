@@ -53,7 +53,7 @@ if [ -f "/data/data/com.termux/files/usr/bin/clawdbot" ]; then
     echo "================================"
     echo ""
     echo "Approve the pairing code:"
-    echo "  clawdbot pairing approve telegram WT4LUXF4"
+    echo "  clawdbot pairing approve telegram <PAIRING_CODE>"
     echo ""
 else
     echo "❌ Installation failed"

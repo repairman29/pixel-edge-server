@@ -11,7 +11,7 @@ ENV_FILE="$CLAWDBOT_DIR/.env"
 SESSIONS_FILE="$CLAWDBOT_DIR/agents/main/sessions/sessions.json"
 BOOT_LOG="$TERMUX_HOME/jarvis-autoboot.log"
 NODE="$PREFIX/bin/node"
-DISCORD_USER_ID_DEFAULT="377601792764018698"
+DISCORD_USER_ID_DEFAULT=""
 
 mkdir -p "$TMP_DIR" "$CLAWDBOT_DIR" "$TERMUX_HOME/jarvis-workspace"
 touch "$BOOT_LOG"

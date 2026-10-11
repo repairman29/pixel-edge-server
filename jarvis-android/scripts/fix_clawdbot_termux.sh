@@ -76,4 +76,4 @@ clawdbot --version 2>&1 && echo "✓ Clawdbot is working!" || echo "✗ Still ha
 
 echo ""
 echo "Attempting to approve pairing..."
-clawdbot pairing approve telegram WT4LUXF4 2>&1 | head -10
+clawdbot pairing approve telegram <PAIRING_CODE> 2>&1 | head -10

@@ -5,8 +5,8 @@
 ✅ **Completed:**
 - Clawdbot installed via npm globally
 - Module location: `/data/data/com.termux/files/usr/lib/node_modules/clawdbot`
-- Pairing code: `WT4LUXF4`
-- Telegram user ID: `8705004824`
+- Pairing code: `<PAIRING_CODE>`
+- Telegram user ID: `<YOUR_TELEGRAM_CHAT_ID>`
 
 ❌ **Issue:**
 - Runtime error with `@mariozechner/clipboard` native module
@@ -32,7 +32,7 @@ npm install -g clawdbot
 
 ### 3. Pairing Attempt
 ```bash
-clawdbot pairing approve telegram WT4LUXF4
+clawdbot pairing approve telegram <PAIRING_CODE>
 # Result: Exit code 1 (runtime error)
 ```
 
@@ -71,7 +71,7 @@ Check if there's a pre-built binary:
 ls /data/data/com.termux/files/usr/lib/node_modules/clawdbot/bin/
 
 # Run directly
-node /data/data/com.termux/files/usr/lib/node_modules/clawdbot/bin/clawdbot pairing approve telegram WT4LUXF4
+node /data/data/com.termux/files/usr/lib/node_modules/clawdbot/bin/clawdbot pairing approve telegram <PAIRING_CODE>
 ```
 
 ### Option 3: Manual Pairing File
@@ -85,8 +85,8 @@ mkdir -p ~/.config/clawdbot
 cat > ~/.config/clawdbot/pairings.json << 'EOF'
 {
   "telegram": {
-    "8705004824": {
-      "code": "WT4LUXF4",
+    "<YOUR_TELEGRAM_CHAT_ID>": {
+      "code": "<PAIRING_CODE>",
       "approved": true,
       "timestamp": "2026-03-05T08:50:00Z"
     }
@@ -101,7 +101,7 @@ If Termux environment is problematic, run Clawdbot on Mac instead:
 ```bash
 # On Mac
 npm install -g clawdbot
-clawdbot pairing approve telegram WT4LUXF4
+clawdbot pairing approve telegram <PAIRING_CODE>
 ```
 
 ## Current State

@@ -40,7 +40,7 @@ pkg install nodejs git vim nano -y
 
 From your Mac (with device connected):
 ```bash
-adb push /Users/jeffadkins/Projects/jarvis-android/scripts/termux_bridge.py /sdcard/jarvis/scripts/
+adb push ~/Projects/jarvis-android/scripts/termux_bridge.py /sdcard/jarvis/scripts/
 ```
 
 Or in Termux:

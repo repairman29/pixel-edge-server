@@ -2,7 +2,7 @@
 # Mac-side SSH setup for Termux connection
 # Run on Mac: bash setup_mac_ssh.sh
 
-TERMUX_IP="100.78.73.64"  # Pixel via Tailscale
+TERMUX_IP="<PIXEL_TAILSCALE_IP>"  # Pixel via Tailscale
 TERMUX_PORT="8022"
 KEY_NAME="termux_pixel"
 

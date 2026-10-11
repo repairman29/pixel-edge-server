@@ -15,7 +15,7 @@ Follow this checklist so the gateway runs on the Pixel and chat works (or return
 The binary must be **Linux aarch64** for Termux. From your Mac:
 
 ```bash
-cd /Users/jeffadkins/Projects/pixel-edge-server
+cd ~/Projects/pixel-edge-server
 ./scripts/build-and-push-pixel.sh
 ```
 

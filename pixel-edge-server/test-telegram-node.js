@@ -2,7 +2,7 @@
 // Test Telegram API with fetch
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const CHAT_ID = "8705004824";
+const CHAT_ID = "<YOUR_TELEGRAM_CHAT_ID>";
 
 console.log("=== Testing Telegram API ===\n");
 

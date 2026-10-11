@@ -15,7 +15,7 @@ source "$HOME/.cargo/env"
 Then build and run:
 
 ```bash
-cd /Users/jeffadkins/Projects/pixel-edge-server/pixel-agent-v2
+cd ~/Projects/pixel-edge-server/pixel-agent-v2
 cargo build
 ./target/debug/pixel-agent-v2
 ```

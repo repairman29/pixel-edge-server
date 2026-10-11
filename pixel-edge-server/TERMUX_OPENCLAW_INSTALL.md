@@ -1,4 +1,4 @@
-# OpenClaw on Termux (Pixel) — no install.sh
+# OpenClaw on Termux (Pixel), no install.sh
 
 The official install script (`curl -fsSL https://openclaw.ai/install.sh | bash`) only supports macOS and standard Linux (`OSTYPE=linux-gnu*` or WSL). **Termux reports `linux-android` or empty `OSTYPE`, so the script exits with "Unsupported operating system".**
 
@@ -25,7 +25,7 @@ pkg update && pkg install nodejs -y
 npm install -g openclaw@latest
 ```
 
-This skips the official installer and only installs the OpenClaw CLI. No daemon (launchd/systemd) is installed — Termux doesn't have those; you'll start the gateway manually or via a script.
+This skips the official installer and only installs the OpenClaw CLI. No daemon (launchd/systemd) is installed, Termux doesn't have those; you'll start the gateway manually or via a script.
 
 ---
 

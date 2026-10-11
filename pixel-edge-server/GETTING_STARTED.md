@@ -1,6 +1,6 @@
 # Getting started: best-in-class Pixel agent
 
-Follow the blueprint phase-by-phase. **Phase 1 first** — pass its test checkpoint before touching the Rust agent.
+Follow the blueprint phase-by-phase. **Phase 1 first**, pass its test checkpoint before touching the Rust agent.
 
 ---
 

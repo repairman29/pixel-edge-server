@@ -28,10 +28,10 @@ adb push pixel-edge-server/pixel-agent /sdcard/jarvis/pixel-agent
 
 ## Usage
 
-- **/start** — Short help.
-- **/status** — Check if Jarvis HTTP API is reachable.
-- **!shell &lt;cmd&gt;** — Run a shell command in Termux (e.g. `!shell ls ~`).
-- **Any other message** — Sent to Jarvis (on-device LLM) and the reply is sent back.
+- **/start**, Short help.
+- **/status**, Check if Jarvis HTTP API is reachable.
+- **!shell &lt;cmd&gt;**, Run a shell command in Termux (e.g. `!shell ls ~`).
+- **Any other message**, Sent to Jarvis (on-device LLM) and the reply is sent back.
 
 ## Running in the background
 
