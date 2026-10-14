@@ -57,3 +57,21 @@ To hit the gateway from your Mac while it runs on the Pixel: `adb forward tcp:18
 
 - **Phase 2:** `/chat` → reflexive (Jarvis 9090 on Pixel). Pass test checkpoint.
 - **Phase 3–5:** Heartbeat, outbox, memory, app, voice, see [BLUEPRINT_BEST_IN_CLASS.md](../BLUEPRINT_BEST_IN_CLASS.md).
+
+## Python gateway (`server.py`)
+
+`server.py` is the live Python edge gateway on :18790 (stdlib only, runs in Termux). It is the
+single home of the gateway: Froogle's `launch/scripts/pixel_gateway.py` was a fork and is now a
+shim that execs this file. The full security contract and every env var are in the module
+docstring. Short version:
+
+- Binds `127.0.0.1` by default (`BIND_HOST`). `adb forward tcp:18790 tcp:18790` lands on the
+  phone's loopback, so that is all adb needs.
+- Host and Origin checks, JSON-only POSTs, no CORS, input validation, no `shell=True`,
+  SMS rate limit (`SMS_RATE_PER_MIN`, default 10).
+- `GATEWAY_TOKEN`: optional bearer token, OFF by default. When set, every route except
+  `GET /` and `GET /health` needs `Authorization: Bearer <token>`, and every Mac caller must send it.
+- Camera output is confined to `CAMERA_DIRS` (default `/sdcard`), `.jpg`/`.jpeg` names only.
+- `/inbound/sync` posts only to `INBOUND_SYNC_URL` (default `http://127.0.0.1:8795/incoming`).
+
+Tests run on the Mac with every Termux call mocked: `pytest -q tests/`.
