@@ -6,3 +6,9 @@ id_ed25519*
 **/assets/**/*key*
 app/build/
 **/build/intermediates/
+
+# per-machine IDE state (shared .idea config stays tracked)
+.idea/.name
+.idea/caches/
+.idea/compiler.xml
+.idea/deploymentTargetSelector.xml
