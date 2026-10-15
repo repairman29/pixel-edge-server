@@ -42,6 +42,8 @@ class FakeCmds:
 def gw(monkeypatch, tmp_path):
     for var in ("GATEWAY_TOKEN", "GATEWAY_ALLOWED_HOSTS", "GATEWAY_ALLOWED_ORIGINS", "CAMERA_DIRS"):
         monkeypatch.delenv(var, raising=False)
+    # Never pick up a real token file from the operator's home directory.
+    monkeypatch.setenv("GATEWAY_TOKEN_FILE", str(tmp_path / "no-such-token"))
     mod = load_module()
     fake = FakeCmds()
     monkeypatch.setattr(mod, "run_cmd", fake)
@@ -376,3 +378,103 @@ def test_no_shell_true_in_source():
 def test_default_bind_is_loopback(monkeypatch):
     monkeypatch.delenv("BIND_HOST", raising=False)
     assert load_module().BIND_HOST == "127.0.0.1"
+
+
+# --- token file -----------------------------------------------------------------
+
+AUTH_ROUTES = [
+    ("GET", "/telemetry", None),
+    ("GET", "/inbound/sms", None),
+    ("GET", "/sms/inbox", None),
+    ("POST", "/inbound/sync", {}),
+    ("POST", "/chat", {"message": "hi"}),
+    ("POST", "/v1/chat/completions", {"messages": [{"role": "user", "content": "hi"}]}),
+    ("POST", "/actuate/sms", {"to": "5550001111", "message": "x"}),
+    ("POST", "/actuate/camera", {"camera_id": 0}),
+    ("POST", "/actuate/torch", {"enabled": True}),
+    ("POST", "/actuate/vibrate", {"duration_ms": 100}),
+]
+
+
+@pytest.fixture
+def token_file(gw, monkeypatch):
+    path = gw.tmp / "token"
+    path.write_text("  file-s3cret\n")
+    monkeypatch.setenv("GATEWAY_TOKEN_FILE", str(path))
+    monkeypatch.setattr(gw.mod, "INBOUND_SYNC_URL", "http://127.0.0.1:9/incoming")
+    return path
+
+
+@pytest.mark.parametrize("method,path,body", AUTH_ROUTES)
+def test_token_file_requires_bearer_on_every_sensitive_route(gw, token_file, method, path, body):
+    assert gw.req(method, path, body)[0] == 401
+    assert gw.req(method, path, body, headers={"Authorization": "Bearer wrong"})[0] == 401
+    assert gw.req(method, path, body, headers={"Authorization": "file-s3cret"})[0] == 401  # no scheme
+    assert gw.fake.calls == []  # nothing reached a termux binary
+    s, _, _ = gw.req(method, path, body, headers={"Authorization": "Bearer file-s3cret"})
+    assert s != 401
+
+
+def test_token_file_right_token_sends_sms(gw, token_file):
+    s, body, _ = gw.req("POST", "/actuate/sms", {"to": "5550001111", "message": "x"},
+                        headers={"Authorization": "Bearer file-s3cret"})
+    assert s == 200 and body["status"] == "sent"
+    assert len(sms_calls(gw.fake)) == 1
+
+
+def test_env_token_wins_over_file(gw, token_file, monkeypatch):
+    monkeypatch.setenv("GATEWAY_TOKEN", "env-token")
+    assert gw.req("GET", "/telemetry", headers={"Authorization": "Bearer file-s3cret"})[0] == 401
+    assert gw.req("GET", "/telemetry", headers={"Authorization": "Bearer env-token"})[0] == 200
+
+
+def test_empty_token_file_keeps_auth_off(gw, monkeypatch):
+    path = gw.tmp / "token"
+    path.write_text("  \n")
+    monkeypatch.setenv("GATEWAY_TOKEN_FILE", str(path))
+    assert gw.req("GET", "/telemetry")[0] == 200
+    assert gw.req("GET", "/health")[1]["auth"] == "off"
+
+
+def test_no_token_anywhere_keeps_current_behavior(gw):
+    assert gw.mod.gateway_token() == ""
+    assert gw.req("GET", "/telemetry")[0] == 200
+    assert gw.req("POST", "/actuate/sms", {"to": "5550001111", "message": "x"})[0] == 200
+    s, body, _ = gw.req("GET", "/health")
+    assert s == 200 and body["auth"] == "off" and "battery" in body and "storage" in body
+
+
+def test_health_reports_auth_and_hides_readings_without_token(gw, token_file):
+    s, body, _ = gw.req("GET", "/health")
+    assert s == 200 and body["status"] == "ok" and body["auth"] == "bearer"
+    for leaked in ("battery", "storage", "uptime_seconds", "device", "os"):
+        assert leaked not in body
+    assert "file-s3cret" not in json.dumps(body)
+    assert gw.fake.calls == []  # no termux-battery-status call for an anonymous probe
+    s, body, _ = gw.req("GET", "/health", headers={"Authorization": "Bearer wrong"})
+    assert s == 200 and "battery" not in body
+    s, body, _ = gw.req("GET", "/health", headers={"Authorization": "Bearer file-s3cret"})
+    assert s == 200 and body["auth"] == "bearer" and "battery" in body and "storage" in body
+    assert gw.req("GET", "/")[0] == 200
+
+
+def test_token_file_rotation_takes_effect_without_restart(gw, token_file):
+    assert gw.req("GET", "/telemetry", headers={"Authorization": "Bearer file-s3cret"})[0] == 200
+    token_file.write_text("rotated")
+    assert gw.req("GET", "/telemetry", headers={"Authorization": "Bearer file-s3cret"})[0] == 401
+    assert gw.req("GET", "/telemetry", headers={"Authorization": "Bearer rotated"})[0] == 200
+
+
+def test_default_token_file_path(monkeypatch):
+    monkeypatch.delenv("GATEWAY_TOKEN_FILE", raising=False)
+    assert load_module().gateway_token_file() == os.path.expanduser("~/.config/pixel-gateway/token")
+
+
+def test_token_compare_uses_hmac_compare_digest():
+    src = SERVER_PATH.read_text()
+    assert "hmac.compare_digest" in src
+    mod = load_module()
+    assert mod.token_matches("Bearer abc", "abc") is True
+    assert mod.token_matches("Bearer abd", "abc") is False
+    assert mod.token_matches("Bearer abc", "") is False
+    assert mod.token_matches(None, "abc") is False

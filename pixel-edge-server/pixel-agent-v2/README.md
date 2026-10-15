@@ -34,7 +34,7 @@ adb push target/aarch64-unknown-linux-gnu/release/pixel-agent-v2 /sdcard/jarvis/
    ```bash
    ./pixel-agent-v2
    ```
-   Gateway listens on `0.0.0.0:18789`; it talks to Jarvis at `127.0.0.1:9090` on the same device.
+   Gateway listens on `127.0.0.1:18789` (loopback only; `adb forward` reaches it); it talks to Jarvis at `127.0.0.1:9090` on the same device.
 5. **Chat** from the native app (when built) or from Termux: `curl -s -X POST http://127.0.0.1:18789/chat -H "Content-Type: application/json" -d '{"message":"hi"}'`
 
 All runtime is on the Pixel: no Mac in the loop.
@@ -44,6 +44,7 @@ All runtime is on the Pixel: no Mac in the loop.
 - **REFLEXIVE_URL**, default `http://127.0.0.1:9090` (Jarvis on same Pixel). Leave unset unless you point at another host.
 - **REFLEXIVE_MODEL**, default `gemma-3b`; override if your backend expects a different model name.
 - **PORT**, gateway listen port (default 18789).
+- **BIND_HOST** (or `--bind <host>`), listen address, default `127.0.0.1`. Set `0.0.0.0` only on purpose: it exposes `/chat` on Wi-Fi / cellular / Tailscale, and the gateway prints a warning.
 
 ## 503 / Jarvis crashes
 
@@ -69,8 +70,15 @@ docstring. Short version:
   phone's loopback, so that is all adb needs.
 - Host and Origin checks, JSON-only POSTs, no CORS, input validation, no `shell=True`,
   SMS rate limit (`SMS_RATE_PER_MIN`, default 10).
-- `GATEWAY_TOKEN`: optional bearer token, OFF by default. When set, every route except
-  `GET /` and `GET /health` needs `Authorization: Bearer <token>`, and every Mac caller must send it.
+- Bearer token, OFF by default. The token is `GATEWAY_TOKEN` if set, else the contents of
+  `GATEWAY_TOKEN_FILE` (default `~/.config/pixel-gateway/token`, whitespace stripped). If
+  neither exists, auth stays off. When on, every route except `GET /` and `GET /health` needs
+  `Authorization: Bearer <token>` (compared with `hmac.compare_digest`), and every Mac caller
+  must send it. That covers `/telemetry`, `/inbound/sms` + `/sms/inbox`, `/inbound/sync`,
+  `/chat`, `/v1/chat/completions` and every `/actuate/*` route (sms, camera, torch, vibrate).
+  `GET /health` stays open and reports `"auth": "bearer"` or `"off"`; with auth on it shows
+  battery, storage and uptime only to a caller that sends the token. To turn auth on:
+  `mkdir -p ~/.config/pixel-gateway && head -c 32 /dev/urandom | base64 > ~/.config/pixel-gateway/token && chmod 600 ~/.config/pixel-gateway/token`. No restart needed: the file is re-read on every request.
 - Camera output is confined to `CAMERA_DIRS` (default `/sdcard`), `.jpg`/`.jpeg` names only.
 - `/inbound/sync` posts only to `INBOUND_SYNC_URL` (default `http://127.0.0.1:8795/incoming`).
 

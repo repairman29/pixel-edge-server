@@ -7,7 +7,7 @@ keeps only a shim that execs this copy.
 
 Routes
   GET  /                      -> "pixel-agent-v2 ok"                         (never needs token)
-  GET  /health                -> battery, storage, uptime, capabilities      (never needs token)
+  GET  /health                -> liveness, auth mode; device readings only if authorized (open)
   GET  /telemetry             -> battery, telephony (real readings only), storage
   GET  /inbound/sms           -> recent inbox via termux-sms-list (alias /sms/inbox)
   POST /inbound/sync          -> push recent inbox to INBOUND_SYNC_URL (sovereign-carrier)
@@ -31,10 +31,14 @@ Security contract (phone-side version of the Froogle local-daemon contract)
   4. POST bodies must be Content-Type application/json and a JSON object (415 / 400), capped
      at GATEWAY_MAX_BODY bytes (413). A text/plain "simple" cross-site POST can no longer fire
      an SMS.
-  5. Optional bearer token: GATEWAY_TOKEN. OFF by default so the live phone flow keeps working.
-     When set, every route except GET / and GET /health needs `Authorization: Bearer <token>`
-     (hmac.compare_digest). Recommended: any Android app with INTERNET permission can reach
-     the phone's loopback, so without a token any installed app can send SMS or read the inbox.
+  5. Optional bearer token: GATEWAY_TOKEN, else the file GATEWAY_TOKEN_FILE (default
+     ~/.config/pixel-gateway/token, stripped). OFF when neither exists, so the live phone flow
+     keeps working. When on, every route except GET / and GET /health needs
+     `Authorization: Bearer <token>` (hmac.compare_digest): /telemetry, the inbox reads,
+     /inbound/sync, /chat, /v1/chat/completions and every /actuate/* route. /health reports
+     "auth": "bearer"|"off" and, with auth on, shows device readings only to a token holder.
+     Recommended: any Android app with INTERNET permission can reach the phone's loopback, so
+     without a token any installed app can send SMS or read the inbox.
   6. Inputs validated: phone numbers, message length, camera id, camera output path (confined
      to CAMERA_DIRS, .jpg/.jpeg basename, no symlink), vibrate duration, torch flag.
   7. Every subprocess call is an argv list (no shell=True). termux-sms-send gets `--` before
@@ -42,7 +46,7 @@ Security contract (phone-side version of the Froogle local-daemon contract)
   8. SMS sends are rate limited (SMS_RATE_PER_MIN, default 10, 0 disables).
   9. Never report success for a failed action (torch / vibrate used to ignore the exit code).
 
-Env: PORT, BIND_HOST, REFLEXIVE_URL, GATEWAY_TOKEN, GATEWAY_ALLOWED_HOSTS,
+Env: PORT, BIND_HOST, REFLEXIVE_URL, GATEWAY_TOKEN, GATEWAY_TOKEN_FILE, GATEWAY_ALLOWED_HOSTS,
      GATEWAY_ALLOWED_ORIGINS, GATEWAY_MAX_BODY, INBOUND_SYNC_URL, CAMERA_DIRS, SMS_MAX_LEN,
      SMS_RATE_PER_MIN, GATEWAY_WAKELOCK (default 1).
 """
@@ -87,8 +91,37 @@ def _csv_env(name):
     return [p.strip() for p in os.environ.get(name, "").split(",") if p.strip()]
 
 
+DEFAULT_TOKEN_FILE = "~/.config/pixel-gateway/token"
+
+
+def gateway_token_file():
+    return os.path.expanduser(os.environ.get("GATEWAY_TOKEN_FILE", "").strip() or DEFAULT_TOKEN_FILE)
+
+
 def gateway_token():
-    return os.environ.get("GATEWAY_TOKEN", "").strip()
+    """The bearer token, or "" when auth is off.
+
+    GATEWAY_TOKEN (env) wins. If it is unset or blank, read GATEWAY_TOKEN_FILE (default
+    ~/.config/pixel-gateway/token), stripped. Neither present = auth off (today's behavior).
+    Read on every call so rotating the file takes effect without a restart.
+    """
+    token = os.environ.get("GATEWAY_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        with open(gateway_token_file(), "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def token_matches(header_value, token):
+    """Constant-time check of an Authorization header against the token."""
+    if not token:
+        return False
+    auth = header_value or ""
+    supplied = auth[7:].strip() if auth.startswith("Bearer ") else ""
+    return bool(supplied) and hmac.compare_digest(supplied.encode("utf-8"), token.encode("utf-8"))
 
 
 def camera_dirs():
@@ -405,9 +438,7 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
                 return False
         token = gateway_token()
         if token and not (self.command == "GET" and path in PUBLIC_GET_PATHS):
-            auth = self.headers.get("Authorization") or ""
-            supplied = auth[7:].strip() if auth.startswith("Bearer ") else ""
-            if not supplied or not hmac.compare_digest(supplied.encode(), token.encode()):
+            if not token_matches(self.headers.get("Authorization"), token):
                 self._send_json(401, {"status": "error", "error": "unauthorized: missing or invalid bearer token"})
                 return False
         return True
@@ -461,18 +492,25 @@ class GatewayHandler(http.server.BaseHTTPRequestHandler):
             return self._send_text(200, "pixel-agent-v2 ok\n")
 
         if path == "/health":
-            bat = get_battery()
-            return self._send_json(200, {
+            # Open route. With auth on, an unauthenticated caller gets liveness + auth mode only;
+            # device readings (battery, storage, uptime) need the token like /telemetry does.
+            token = gateway_token()
+            health = {
                 "status": "ok",
                 "agent": "pixel-8-alpha",
-                "device": "Pixel 8 Pro",
-                "os": "GrapheneOS (Android ARM64)",
-                "uptime_seconds": int(time.time() - START_TIME),
-                "battery": {k: bat.get(k) for k in ("percentage", "health", "temperature", "status")},
-                "storage": get_disk_info(),
                 "capabilities": ["chat", "telemetry", "camera", "sms", "sms_inbox", "torch", "vibrate"],
-                "auth": "bearer" if gateway_token() else "off",
-            })
+                "auth": "bearer" if token else "off",
+            }
+            if not token or token_matches(self.headers.get("Authorization"), token):
+                bat = get_battery()
+                health.update({
+                    "device": "Pixel 8 Pro",
+                    "os": "GrapheneOS (Android ARM64)",
+                    "uptime_seconds": int(time.time() - START_TIME),
+                    "battery": {k: bat.get(k) for k in ("percentage", "health", "temperature", "status")},
+                    "storage": get_disk_info(),
+                })
+            return self._send_json(200, health)
 
         if path == "/telemetry":
             return self._send_json(200, {
@@ -644,7 +682,8 @@ def main():
         print(f"WARNING: binding {BIND_HOST}: the gateway (SMS send, inbox read) is reachable off-device. "
               f"adb forward only needs 127.0.0.1.", file=sys.stderr)
     if not gateway_token():
-        print("note: GATEWAY_TOKEN unset; any local process or app on the phone can call every route.",
+        print(f"note: no GATEWAY_TOKEN and no token file at {gateway_token_file()}; "
+              "any local process or app on the phone can call every route.",
               file=sys.stderr)
     httpd = make_server()
     print(f"Pixel Edge Gateway listening on http://{BIND_HOST}:{PORT} (REFLEXIVE_URL={REFLEXIVE_URL})",
