@@ -1,10 +1,12 @@
 //! Pixel agent v2: gateway, router, reflexive/neocortex (Phase 2).
-//! Run with default gateway on 0.0.0.0:18789 (or PORT env).
+//! Binds 127.0.0.1:18789 by default. PORT env sets the port. BIND_HOST env (or `--bind <host>`)
+//! binds elsewhere on purpose, e.g. `BIND_HOST=0.0.0.0`; a non-loopback bind prints a warning,
+//! because /chat is then reachable off-device (Wi-Fi, cellular, Tailscale).
 //! REFLEXIVE_URL defaults to http://127.0.0.1:9090 (Jarvis on device).
 
 use axum::{routing::get, routing::post, Json, Router};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tower_http::cors::CorsLayer;
 
 #[derive(Debug, Deserialize)]
@@ -154,6 +156,39 @@ async fn call_hf_fallback(user_message: &str) -> Result<String, String> {
     })
 }
 
+const DEFAULT_PORT: u16 = 18789;
+
+/// Resolve the listen address. Precedence for the host: `--bind <host>` / `--bind=<host>`,
+/// then BIND_HOST, then 127.0.0.1. Port: PORT, else 18789. Errors on an unparsable host
+/// instead of silently falling back to a wider bind.
+fn resolve_bind(args: &[String], bind_env: Option<String>, port_env: Option<String>) -> Result<SocketAddr, String> {
+    let mut flag: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        let a = &args[i];
+        if a == "--bind" {
+            flag = Some(args.get(i + 1).cloned().ok_or("--bind needs a host")?);
+            i += 1;
+        } else if let Some(v) = a.strip_prefix("--bind=") {
+            flag = Some(v.to_string());
+        }
+        i += 1;
+    }
+    let host = flag
+        .or(bind_env)
+        .map(|h| h.trim().trim_matches(|c| c == '[' || c == ']').to_string())
+        .filter(|h| !h.is_empty());
+    let ip: IpAddr = match host.as_deref() {
+        None => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        Some("localhost") => IpAddr::V4(Ipv4Addr::LOCALHOST),
+        Some(h) => h.parse().map_err(|_| format!("invalid bind host {:?}: use an IP address", h))?,
+    };
+    let port = port_env
+        .and_then(|s| s.trim().parse::<u16>().ok())
+        .unwrap_or(DEFAULT_PORT);
+    Ok(SocketAddr::new(ip, port))
+}
+
 #[tokio::main]
 async fn main() {
     let app = Router::new()
@@ -162,12 +197,73 @@ async fn main() {
         .route("/chat", post(chat))
         .layer(CorsLayer::permissive());
 
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(18789);
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let addr = match resolve_bind(&args, std::env::var("BIND_HOST").ok(), std::env::var("PORT").ok()) {
+        Ok(a) => a,
+        Err(e) => {
+            eprintln!("error: {}", e);
+            std::process::exit(2);
+        }
+    };
+    if !addr.ip().is_loopback() {
+        eprintln!(
+            "WARNING: binding {}: /chat is reachable off-device (Wi-Fi, cellular, Tailscale). \
+             adb forward only needs 127.0.0.1.",
+            addr
+        );
+    }
     println!("Gateway listening on http://{}", addr);
 
     axum::serve(tokio::net::TcpListener::bind(addr).await.unwrap(), app).await.unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(v: &[&str]) -> Vec<String> {
+        v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn default_is_loopback_18789() {
+        let a = resolve_bind(&[], None, None).unwrap();
+        assert_eq!(a, "127.0.0.1:18789".parse().unwrap());
+        assert!(a.ip().is_loopback());
+    }
+
+    #[test]
+    fn port_env_still_works() {
+        let a = resolve_bind(&[], None, Some("9999".into())).unwrap();
+        assert_eq!(a, "127.0.0.1:9999".parse().unwrap());
+        let a = resolve_bind(&[], None, Some("nope".into())).unwrap();
+        assert_eq!(a.port(), DEFAULT_PORT);
+    }
+
+    #[test]
+    fn bind_host_env_binds_elsewhere() {
+        let a = resolve_bind(&[], Some("0.0.0.0".into()), None).unwrap();
+        assert_eq!(a, "0.0.0.0:18789".parse().unwrap());
+        assert!(!a.ip().is_loopback());
+        let a = resolve_bind(&[], Some("[::1]".into()), None).unwrap();
+        assert!(a.ip().is_loopback());
+        let a = resolve_bind(&[], Some("localhost".into()), None).unwrap();
+        assert!(a.ip().is_loopback());
+        let a = resolve_bind(&[], Some("   ".into()), None).unwrap();
+        assert!(a.ip().is_loopback());
+    }
+
+    #[test]
+    fn flag_beats_env() {
+        let a = resolve_bind(&args(&["--bind", "0.0.0.0"]), Some("127.0.0.1".into()), None).unwrap();
+        assert_eq!(a.ip().to_string(), "0.0.0.0");
+        let a = resolve_bind(&args(&["--bind=127.0.0.1"]), Some("0.0.0.0".into()), None).unwrap();
+        assert!(a.ip().is_loopback());
+    }
+
+    #[test]
+    fn bad_host_is_an_error_not_a_wider_bind() {
+        assert!(resolve_bind(&[], Some("not-an-ip".into()), None).is_err());
+        assert!(resolve_bind(&args(&["--bind"]), None, None).is_err());
+    }
 }
